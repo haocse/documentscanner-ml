@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.hardware.Camera;
+import android.os.Environment;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -25,6 +26,8 @@ import org.opencv.core.Point;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.utils.Converters;
+import org.opencv.ximgproc.StructuredEdgeDetection;
+import org.opencv.ximgproc.Ximgproc;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -284,6 +287,18 @@ public class ScanUtils {
         return null;
     }
 
+    public static Quadrilateral detectLargestQuadrilateralWithEdgeDetection(Mat mat, StructuredEdgeDetection edgeDetection) {
+
+
+        List<MatOfPoint> largestContour = findLargestContourWithEdgeDetection(mat, edgeDetection);
+        if (null != largestContour) {
+            Quadrilateral mLargestRect = findQuadrilateral(largestContour);
+            if (mLargestRect != null)
+                return mLargestRect;
+        }
+        return null;
+    }
+
     public static double getMaxCosine(double maxCosine, Point[] approxPoints) {
         Log.i(TAG, "ANGLES ARE:");
         for (int i = 2; i < 5; i++) {
@@ -333,7 +348,8 @@ public class ScanUtils {
         return result;
     }
 
-    private static List<MatOfPoint> findLargestContour(Mat inputMat) {
+
+    public static Mat findLargestMatWithEdgeDetection(Mat inputMat, StructuredEdgeDetection edgeDetection) {
         Mat mHierarchy = new Mat();
         List<MatOfPoint> mContourList = new ArrayList<>();
         //finding contours
@@ -344,8 +360,7 @@ public class ScanUtils {
 //        Imgproc.findContours(inputMat, mContourList, mHierarchy, Imgproc.RETR_EXTERNAL,
 //                Imgproc.CHAIN_APPROX_SIMPLE);
 
-        // Approach 2:
-
+        /*// Approach 2:
         Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
         Size size = new Size(inputMat.size().width, inputMat.size().height);
         Mat grayImage = new Mat(size, CvType.CV_8UC4);
@@ -359,14 +374,118 @@ public class ScanUtils {
         Imgproc.Canny(grayImage, cannedImage, 75.0, 200.0);
 
         Imgproc.dilate(cannedImage, dilate, kernel);
+//        Imgproc.findContours(dilate, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
 
-//        Mat hierarchy = new Mat();
-        Imgproc.findContours(dilate, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+        return dilate;*/
+
+        // Approach 3:
+        Mat rgb = new Mat();
+        Imgproc.cvtColor(inputMat, rgb, Imgproc.COLOR_BGRA2BGR);
+
+        Mat srcImage = new Mat();
+        rgb.convertTo(srcImage,  CvType.CV_32FC1, 1.0 / 255.0);
+
+        Mat edgesImage = new Mat(srcImage.size(), srcImage.type());
+//        StructuredEdgeDetection edgeDetection = Ximgproc.createStructuredEdgeDetection(Environment.getExternalStorageDirectory().getAbsolutePath() + "/model.yml");
+        long time1 = System.currentTimeMillis();
+        edgeDetection.detectEdges(srcImage, edgesImage);
+        long printed = System.currentTimeMillis() - time1;
+        Log.d(">>>", "The time is: " + printed);
+        edgesImage.convertTo(edgesImage, CvType.CV_8UC1, 255.0);
+
+        rgb.release();
+        srcImage.release();
+
+//        Imgproc.findContours(edgesImage, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
 //        contours.sortByDescending { p: MatOfPoint -> Imgproc.contourArea(p) }
 
-        Mat mContoursMat = new Mat();
-        mContoursMat.create(inputMat.rows(), inputMat.cols(), CvType.CV_8U);
 
+
+//        edgesImage.release();
+
+//        Mat mContoursMat = new Mat();
+//        mContoursMat.create(inputMat.rows(), inputMat.cols(), CvType.CV_8U);
+        inputMat.release();
+        return edgesImage;
+    }
+
+    public static Mat findLargestMat(Mat inputMat) {
+        Mat mHierarchy = new Mat();
+        List<MatOfPoint> mContourList = new ArrayList<>();
+        //finding contours
+        // Approach 1:
+//        Mat mGrayMat = new Mat(inputMat.rows(), inputMat.cols(), CV_8UC1);
+//        Imgproc.cvtColor(inputMat, mGrayMat, Imgproc.COLOR_BGR2GRAY, 4);
+//        Imgproc.threshold(mGrayMat, mGrayMat, 150, 255, THRESH_BINARY + THRESH_OTSU);
+//        Imgproc.findContours(inputMat, mContourList, mHierarchy, Imgproc.RETR_EXTERNAL,
+//                Imgproc.CHAIN_APPROX_SIMPLE);
+
+        // Approach 2:
+        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
+        Size size = new Size(inputMat.size().width, inputMat.size().height);
+        Mat grayImage = new Mat(size, CvType.CV_8UC4);
+        Mat cannedImage = new Mat(size, CvType.CV_8UC1);
+        Mat dilate = new Mat(size, CvType.CV_8UC1);
+
+        Imgproc.cvtColor(inputMat, grayImage, Imgproc.COLOR_RGBA2GRAY);
+        Imgproc.GaussianBlur(grayImage, grayImage, new Size(5.0, 5.0), 0.0);
+        Imgproc.threshold(grayImage, grayImage, 20.0, 255.0, Imgproc.THRESH_TRIANGLE);
+
+        Imgproc.Canny(grayImage, cannedImage, 75.0, 200.0);
+
+        Imgproc.dilate(cannedImage, dilate, kernel);
+//        Imgproc.findContours(dilate, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+
+        return dilate;
+
+        // Approach 3:
+        /*Mat rgb = new Mat();
+        Imgproc.cvtColor(inputMat, rgb, Imgproc.COLOR_BGRA2BGR);
+
+        Mat srcImage = new Mat();
+        rgb.convertTo(srcImage,  CvType.CV_32FC1, 1.0 / 255.0);
+
+        Mat edgesImage = new Mat(srcImage.size(), srcImage.type());
+        StructuredEdgeDetection edgeDetection = Ximgproc.createStructuredEdgeDetection(Environment.getExternalStorageDirectory().getAbsolutePath() + "/model.yml");
+
+//        edgeDetection.detectEdges(srcImage, edgesImage);
+//        edgesImage.convertTo(edgesImage, CvType.CV_8UC1, 255.0);
+
+        rgb.release();
+//        srcImage.release();
+
+//        Imgproc.findContours(edgesImage, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+//        contours.sortByDescending { p: MatOfPoint -> Imgproc.contourArea(p) }
+
+
+
+//        edgesImage.release();
+
+//        Mat mContoursMat = new Mat();
+//        mContoursMat.create(inputMat.rows(), inputMat.cols(), CvType.CV_8U);
+        inputMat.release();
+        return srcImage;*/
+    }
+
+    public static List<MatOfPoint> findLargestContourWithEdgeDetection(Mat inputMat, StructuredEdgeDetection edgeDetection) {
+        Mat dilate = findLargestMatWithEdgeDetection(inputMat, edgeDetection);
+
+        return findLargestContourFromMat(dilate);
+
+    }
+
+    public static List<MatOfPoint> findLargestContour(Mat inputMat) {
+        Mat dilate = findLargestMat(inputMat);
+
+        return findLargestContourFromMat(dilate);
+
+    }
+
+    public static List<MatOfPoint> findLargestContourFromMat(Mat dilate) {
+        Mat mHierarchy = new Mat();
+        List<MatOfPoint> mContourList = new ArrayList<>();
+
+        Imgproc.findContours(dilate, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
         if (mContourList.size() != 0) {
             Collections.sort(mContourList, new Comparator<MatOfPoint>() {
                 @Override
@@ -379,7 +498,7 @@ public class ScanUtils {
         return null;
     }
 
-    private static Quadrilateral findQuadrilateral(List<MatOfPoint> mContourList) {
+    public static Quadrilateral findQuadrilateral(List<MatOfPoint> mContourList) {
         for (MatOfPoint c : mContourList) {
             MatOfPoint2f c2f = new MatOfPoint2f(c.toArray());
             double peri = Imgproc.arcLength(c2f, true);
@@ -388,6 +507,7 @@ public class ScanUtils {
             Point[] points = approx.toArray();
             // select biggest 4 angles polygon
             if (approx.rows() == 4) {
+                Log.d(">>>", "Found");
                 Point[] foundPoints = sortPoints(points);
                 return new Quadrilateral(approx, foundPoints);
             }

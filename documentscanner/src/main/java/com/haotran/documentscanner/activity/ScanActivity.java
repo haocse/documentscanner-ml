@@ -10,6 +10,7 @@ import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -45,6 +46,8 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.ximgproc.StructuredEdgeDetection;
+import org.opencv.ximgproc.Ximgproc;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,6 +80,8 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
     private View cropRejectBtn;
     private Bitmap copyBitmap;
     private FrameLayout cropLayout;
+    private ImageView frame;
+    StructuredEdgeDetection edgeDetection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +93,7 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
     }
 
     private void init() {
+        frame = findViewById(R.id.frame);
         containerScan = findViewById(R.id.container_scan);
         cameraPreviewLayout = findViewById(R.id.camera_preview);
         captureHintLayout = findViewById(R.id.capture_hint_layout);
@@ -97,6 +103,8 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
         cropAcceptBtn = findViewById(R.id.crop_accept_btn);
         cropRejectBtn = findViewById(R.id.crop_reject_btn);
         cropLayout = findViewById(R.id.crop_layout);
+
+        edgeDetection = Ximgproc.createStructuredEdgeDetection(Environment.getExternalStorageDirectory().getAbsolutePath() + "/model.yml");
 
         cropAcceptBtn.setOnClickListener(this);
         cropRejectBtn.setOnClickListener(new View.OnClickListener() {
@@ -139,8 +147,10 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
     private void initCamera() {
 //        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, this);
 //        cameraPreviewLayout.addView(mImageSurfaceView);
-        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, ScanActivity.this);
+        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, ScanActivity.this, frame, edgeDetection);
         cameraPreviewLayout.addView(mImageSurfaceView);
+
+
 
 //        mImageSurfaceView.setOnTouchListener(new View.OnTouchListener() {
 //            @Override
@@ -246,7 +256,7 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
             ArrayList<PointF> points;
             Map<Integer, PointF> pointFs = new HashMap<>();
             try {
-                Quadrilateral quad = ScanUtils.detectLargestQuadrilateral(originalMat);
+                Quadrilateral quad = ScanUtils.detectLargestQuadrilateralWithEdgeDetection(originalMat, edgeDetection);
                 if (null != quad) {
                     double resultArea = Math.abs(Imgproc.contourArea(quad.contour));
                     double previewArea = originalMat.rows() * originalMat.cols();
