@@ -38,6 +38,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import static org.opencv.imgproc.Imgproc.THRESH_TRIANGLE;
+
 /**
  * This class provides utilities for camera.
  */
@@ -352,32 +354,6 @@ public class ScanUtils {
     public static Mat findLargestMatWithEdgeDetection(Mat inputMat, StructuredEdgeDetection edgeDetection) {
         Mat mHierarchy = new Mat();
         List<MatOfPoint> mContourList = new ArrayList<>();
-        //finding contours
-        // Approach 1:
-//        Mat mGrayMat = new Mat(inputMat.rows(), inputMat.cols(), CV_8UC1);
-//        Imgproc.cvtColor(inputMat, mGrayMat, Imgproc.COLOR_BGR2GRAY, 4);
-//        Imgproc.threshold(mGrayMat, mGrayMat, 150, 255, THRESH_BINARY + THRESH_OTSU);
-//        Imgproc.findContours(inputMat, mContourList, mHierarchy, Imgproc.RETR_EXTERNAL,
-//                Imgproc.CHAIN_APPROX_SIMPLE);
-
-        /*// Approach 2:
-        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
-        Size size = new Size(inputMat.size().width, inputMat.size().height);
-        Mat grayImage = new Mat(size, CvType.CV_8UC4);
-        Mat cannedImage = new Mat(size, CvType.CV_8UC1);
-        Mat dilate = new Mat(size, CvType.CV_8UC1);
-
-        Imgproc.cvtColor(inputMat, grayImage, Imgproc.COLOR_RGBA2GRAY);
-        Imgproc.GaussianBlur(grayImage, grayImage, new Size(5.0, 5.0), 0.0);
-        Imgproc.threshold(grayImage, grayImage, 20.0, 255.0, Imgproc.THRESH_TRIANGLE);
-
-        Imgproc.Canny(grayImage, cannedImage, 75.0, 200.0);
-
-        Imgproc.dilate(cannedImage, dilate, kernel);
-//        Imgproc.findContours(dilate, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
-
-        return dilate;*/
-
         // Approach 3:
         Mat rgb = new Mat();
         Imgproc.cvtColor(inputMat, rgb, Imgproc.COLOR_BGRA2BGR);
@@ -388,24 +364,51 @@ public class ScanUtils {
         Mat edgesImage = new Mat(srcImage.size(), srcImage.type());
 //        StructuredEdgeDetection edgeDetection = Ximgproc.createStructuredEdgeDetection(Environment.getExternalStorageDirectory().getAbsolutePath() + "/model.yml");
         long time1 = System.currentTimeMillis();
-        edgeDetection.detectEdges(srcImage, edgesImage);
+
+        // make a smaller scale...
+        Mat resizeimage = new Mat();
+        double scale = 0.2;
+        double originalWidth = srcImage.size().width;
+        double originalHeight = srcImage.size().height;
+        double newWidth = srcImage.size().width * scale;
+        double newHeight = srcImage.size().height * scale;
+
+        Size sz = new Size(newWidth,newHeight);
+        Log.d(">>>", "width: " + newWidth);
+        Log.d(">>>", "height: " + newHeight);
+        Imgproc.resize( srcImage, resizeimage, sz );
+        edgeDetection.detectEdges(resizeimage, edgesImage);
+
         long printed = System.currentTimeMillis() - time1;
         Log.d(">>>", "The time is: " + printed);
-        edgesImage.convertTo(edgesImage, CvType.CV_8UC1, 255.0);
 
+        Mat orientation_map = new Mat();
+        edgeDetection.computeOrientation(edgesImage, orientation_map);
+//        Mat edge_nms = new Mat();
+        edgeDetection.edgesNms(edgesImage, orientation_map, edgesImage, 2, 0, 1, true);
+//        edgeDetection.edgesNms(edgesImage, orientation_map, edgesImage);
+
+        edgesImage.convertTo(edgesImage, CvType.CV_8UC1, 255.0);
+//        Imgproc.threshold(edgesImage, edgesImage, 200, 255, THRESH_TRIANGLE);
+
+        Mat lines = new Mat();
+        long houghTime = System.currentTimeMillis();
+//        Imgproc.HoughLinesP(edgesImage, lines, 1, Math.PI / 180, 50, 300, 50);
+//        Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
+
+
+//        Size sz2 = new Size(originalWidth,originalHeight);
+//        Imgproc.resize(edgesImage, edgesImage, sz2);
+
+//        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
+//        Mat dilate = new Mat(sz2, CvType.CV_8UC1);
+//        Imgproc.dilate(edgesImage, dilate, kernel);
+
+        orientation_map.release();
         rgb.release();
         srcImage.release();
-
-//        Imgproc.findContours(edgesImage, mContourList, mHierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
-//        contours.sortByDescending { p: MatOfPoint -> Imgproc.contourArea(p) }
-
-
-
 //        edgesImage.release();
-
-//        Mat mContoursMat = new Mat();
-//        mContoursMat.create(inputMat.rows(), inputMat.cols(), CvType.CV_8U);
-        inputMat.release();
+//        return dilate;
         return edgesImage;
     }
 
@@ -429,7 +432,7 @@ public class ScanUtils {
 
         Imgproc.cvtColor(inputMat, grayImage, Imgproc.COLOR_RGBA2GRAY);
         Imgproc.GaussianBlur(grayImage, grayImage, new Size(5.0, 5.0), 0.0);
-        Imgproc.threshold(grayImage, grayImage, 20.0, 255.0, Imgproc.THRESH_TRIANGLE);
+        Imgproc.threshold(grayImage, grayImage, 20.0, 255.0, THRESH_TRIANGLE);
 
         Imgproc.Canny(grayImage, cannedImage, 75.0, 200.0);
 

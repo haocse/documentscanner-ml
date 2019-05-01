@@ -81,6 +81,8 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
     private Bitmap copyBitmap;
     private FrameLayout cropLayout;
     private ImageView frame;
+    private ImageView frame2;
+    private ImageView frame3;
     StructuredEdgeDetection edgeDetection;
 
     @Override
@@ -94,6 +96,8 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
 
     private void init() {
         frame = findViewById(R.id.frame);
+        frame2 = findViewById(R.id.frame2);
+        frame3 = findViewById(R.id.frame3);
         containerScan = findViewById(R.id.container_scan);
         cameraPreviewLayout = findViewById(R.id.camera_preview);
         captureHintLayout = findViewById(R.id.capture_hint_layout);
@@ -147,7 +151,7 @@ public class ScanActivity extends AppCompatActivity implements IScanner, View.On
     private void initCamera() {
 //        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, this);
 //        cameraPreviewLayout.addView(mImageSurfaceView);
-        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, ScanActivity.this, frame, edgeDetection);
+        mImageSurfaceView = new ScanSurfaceView(ScanActivity.this, ScanActivity.this, frame, frame2, frame3, edgeDetection);
         cameraPreviewLayout.addView(mImageSurfaceView);
 
 

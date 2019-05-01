@@ -37,6 +37,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -71,12 +72,15 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     private Camera.Size previewSize;
     private boolean isCapturing = false;
     ImageView imageView;
+    ImageView imageView2;
+    ImageView imageView3;
+
 
     StructuredEdgeDetection edgeDetection;
 
 
     @SuppressLint("ClickableViewAccessibility")
-    public ScanSurfaceView(Context context, IScanner iScanner, ImageView imageView, StructuredEdgeDetection edgeDetection) {
+    public ScanSurfaceView(Context context, IScanner iScanner, ImageView imageView,ImageView imageView2,ImageView imageView3, StructuredEdgeDetection edgeDetection) {
         super(context);
         mSurfaceView = new SurfaceView(context);
         addView(mSurfaceView);
@@ -92,11 +96,18 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         mSurfaceView.setOnTouchListener(new OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
-                cameraFocus(motionEvent);
+                try {
+                    cameraFocus(motionEvent);
+                } catch (Exception e) {
+                    Log.e(">>>", e.getMessage());
+                }
+
                 return true;
             }
         });
         this.imageView = imageView;
+        this.imageView2 = imageView2;
+        this.imageView3 = imageView3;
     }
 
     @Override
@@ -262,7 +273,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         @Override
         public void onPreviewFrame(final byte[] data, final Camera camera) {
             long now = System.currentTimeMillis() - currentTime;
-            if (now < 1000) {
+            if (now < 500) {
                 return;
             } else {
                 currentTime = System.currentTimeMillis();
@@ -273,17 +284,22 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                 AsyncTask.execute(new Runnable() {
                     @Override
                     public void run() {
-                        //TODO your background code
-                        Camera.Size pictureSize = camera.getParameters().getPreviewSize();
-                        int width = pictureSize.width;
-                        int height = pictureSize.height;
 
-                        Log.d(TAG, "onPreviewFrame - received image " + pictureSize.width + "x" + pictureSize.height);
-                        Mat yuv = new Mat(new Size(pictureSize.width, pictureSize.height * 1.5), CV_8UC1);
-                        yuv.put(0, 0, data);
+                    }
+                });
 
-                        Mat mat = new Mat(new Size(pictureSize.width, pictureSize.height), CvType.CV_8UC4);
-                        Imgproc.cvtColor(yuv, mat, Imgproc.COLOR_YUV2BGR_NV21, 4);
+                try {
+                    //TODO your background code
+                    Camera.Size pictureSize = camera.getParameters().getPreviewSize();
+                    int width = pictureSize.width;
+                    int height = pictureSize.height;
+
+                    Log.d(TAG, "onPreviewFrame - received image " + pictureSize.width + "x" + pictureSize.height);
+                    Mat yuv = new Mat(new Size(pictureSize.width, pictureSize.height * 1.5), CV_8UC1);
+                    yuv.put(0, 0, data);
+
+                    Mat mat = new Mat(new Size(pictureSize.width, pictureSize.height), CvType.CV_8UC4);
+                    Imgproc.cvtColor(yuv, mat, Imgproc.COLOR_YUV2BGR_NV21, 4);
 
 
 //                    Mat mat = yuv;
@@ -299,7 +315,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
 //                    SaveImage(mat);
 
-                        yuv.release();
+                    yuv.release();
 
 
 
@@ -314,68 +330,143 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    bitmap.recycle();
 
 
-                        final Size originalPreviewSize = mat.size();
-                        final int originalPreviewArea = mat.rows() * mat.cols();
+                    final Size originalPreviewSize = mat.size();
+                    final int originalPreviewArea = mat.rows() * mat.cols();
+                    double scale = 0.2;
+//                    double originalWidth = srcImage.size().width;
+//                    double originalHeight = srcImage.size().height;
+//                    double newWidth = srcImage.size().width * scale;
+//                    double newHeight = srcImage.size().height * scale;
 
 
-
-                        // split this function to multiple lines.
-                        Quadrilateral largestQuad = null; //ScanUtils.detectLargestQuadrilateral(mat);
+                    // split this function to multiple lines.
 
 //                    List<MatOfPoint> largestContour = ScanUtils.findLargestContour(mat);
-                        Mat dilate = ScanUtils.findLargestMatWithEdgeDetection(mat, edgeDetection);
+                    Mat dilate = ScanUtils.findLargestMatWithEdgeDetection(mat, edgeDetection); //small size
+//                    Mat dilate;
+//                    dilate = ScanUtils.findLargestMat(mat);
 
-                        // convert to bitmap:
-                        final Bitmap bm = Bitmap.createBitmap(dilate.cols(), dilate.rows(),Bitmap.Config.ARGB_8888);
-                        Utils.matToBitmap(dilate, bm);
-                        // find the imageview and draw it!
+                    final Bitmap bm = Bitmap.createBitmap(dilate.cols(), dilate.rows(),Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(dilate, bm);
+
+//                    // make lines here
+                    Mat lines = new Mat();
+                    long houghTime = System.currentTimeMillis();
+                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 100, 20); // threshold 65
+//                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 4); // threshold 65
+                    // 100 20
+                    // 30 4
+                    Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
+//                    Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
+
+                    Mat houghLines = new Mat(new Size(dilate.size().width, dilate.size().height), CvType.CV_8UC1);
+                    houghLines.create(dilate.rows(), dilate.cols(), CvType.CV_8UC1);
+                    //Drawing lines on the image
+                    for (int i = 0; i < lines.rows(); i++) {
+                        double[] points = lines.get(i, 0);
+                        double x1, y1, x2, y2;
+
+                        x1 = points[0];
+                        y1 = points[1];
+                        x2 = points[2];
+                        y2 = points[3];
+
+                        Log.d(">>>", "Coordinates: x1=>"+x1+" y1=>"+y1+" x2=>"+x2+" y2=>"+y2);
+
+                        Point pt1 = new Point(x1, y1);
+                        Point pt2 = new Point(x2, y2);
+
+                        //Drawing lines on an image
+                        double dx = x1 - x2;
+                        double dy = y1 - y2;
+                        double dist = Math.sqrt (dx*dx + dy*dy);
+//                        if(dist>300.d)
+                            Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+                    }
+//
+//                    //Converting Mat back to Bitmap
+                    File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+                    String filename = "lines.png";
+                    File file = new File(path, filename);
+
+                    Boolean bool = null;
+                    filename = file.toString();
+                    Imgcodecs.imwrite(filename, houghLines);
+
+                    final Bitmap currentBitmap = Bitmap.createBitmap(dilate.cols(), dilate.rows(),Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(houghLines, currentBitmap);
+
+                    imageView.setImageBitmap(currentBitmap);
+                    imageView2.setImageBitmap(bm);
+                    houghLines.release();
+//                    currentBitmap.recycle();
+
+//                    imageView.setImageBitmap(bm);
+
+
+
+                    filename = "processed.png";
+                    file = new File(path, filename);
+                    filename = file.toString();
+                    Imgcodecs.imwrite(filename, dilate);
+
+                    Mat dilate2;
+                    dilate2 = ScanUtils.findLargestMat(mat);
+                    double newWidth = mat.size().width * scale;
+                    double newHeight = mat.size().height * scale;
+                    Size sz = new Size(newWidth,newHeight);
+//                    Log.d(">>>", "width: " + newWidth);
+//                    Log.d(">>>", "height: " + newHeight);
+                    Imgproc.resize( dilate2, dilate2, sz);
+                    final Bitmap bm2 = Bitmap.createBitmap(dilate2.cols(), dilate2.rows(),Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(dilate2, bm2);
+                    imageView3.setImageBitmap(bm2);
+                    dilate2.release();
+
+                    Size sz2 = new Size(originalPreviewSize.width,originalPreviewSize.height);
+                    Imgproc.resize(dilate, dilate, sz2);
+
+
+
+
+                    // find the imageview and draw it!
 //                    ImageView iv = (ImageView) findViewById(R.id.imageView1);
 
-                        ((Activity)context).runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                // update UI
-//                                runInBackground();
-                                imageView.setImageBitmap(bm);
-
-                            }
-                        });
-
-
+//                    ((Activity)context).runOnUiThread(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            // update UI
+////                                runInBackground();
+//
+//
+//                        }
+//                    });
 
 
-                        List<MatOfPoint> largestContour = ScanUtils.findLargestContourFromMat(dilate);
 
-                        if (null != largestContour) {
-                            Quadrilateral mLargestRect = ScanUtils.findQuadrilateral(largestContour);
-                            if (mLargestRect != null)
-                                largestQuad = mLargestRect;
-                        }
+
+
+                    Quadrilateral largestQuad = null; //ScanUtils.detectLargestQuadrilateral(mat);
+                    List<MatOfPoint> largestContour = ScanUtils.findLargestContourFromMat(dilate);
+                    if (null != largestContour) {
+                        Quadrilateral mLargestRect = ScanUtils.findQuadrilateral(largestContour);
+                        if (mLargestRect != null)
+                            largestQuad = mLargestRect;
+                    }
 
 //                    Quadrilateral largestQuad = ScanUtils.detectLargestQuadrilateral(img);
-                        clearAndInvalidateCanvas();
+                    clearAndInvalidateCanvas();
 //                    img.release();
 
-                        mat.release();
+                    mat.release();
+                    dilate.release();
 
-                        final Quadrilateral finalLargestQuad = largestQuad;
-                        ((Activity)context).runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                // update UI
-                                if (null != finalLargestQuad) {
-                                    drawLargestRect(finalLargestQuad.contour, finalLargestQuad.points, originalPreviewSize, originalPreviewArea);
-                                } else {
-                                    showFindingReceiptHint();
-                                }
-
-                            }
-                        });
-
+                    final Quadrilateral finalLargestQuad = largestQuad;
+                    if (null != finalLargestQuad) {
+                        drawLargestRect(finalLargestQuad.contour, finalLargestQuad.points, originalPreviewSize, originalPreviewArea);
+                    } else {
+                        showFindingReceiptHint();
                     }
-                });
-
-                try {
 
                 } catch (Exception e) {
                     showFindingReceiptHint();
@@ -733,6 +824,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //            } catch (Exception e) {
 //
 //            }
+
 
             camera.setParameters(parameters);
             camera.autoFocus(new Camera.AutoFocusCallback() {
