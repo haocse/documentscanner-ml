@@ -281,12 +281,12 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             if (null != camera ) {
                 //Convert try to async ....
 
-                AsyncTask.execute(new Runnable() {
-                    @Override
-                    public void run() {
-
-                    }
-                });
+//                AsyncTask.execute(new Runnable() {
+//                    @Override
+//                    public void run() {
+//
+//                    }
+//                });
 
                 try {
                     //TODO your background code
@@ -352,7 +352,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    // make lines here
                     Mat lines = new Mat();
                     long houghTime = System.currentTimeMillis();
-                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 100, 20); // threshold 65
+//                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 10, 20); // threshold 65
+                     //replace HoughLinesP to HoughLines.
+                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 65/*, 100, 20*/); // threshold 65
+//                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 50/*, 100, 20*/); // threshold 65
 //                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 4); // threshold 65
                     // 100 20
                     // 30 4
@@ -362,27 +365,37 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Mat houghLines = new Mat(new Size(dilate.size().width, dilate.size().height), CvType.CV_8UC1);
                     houghLines.create(dilate.rows(), dilate.cols(), CvType.CV_8UC1);
                     //Drawing lines on the image
-                    for (int i = 0; i < lines.rows(); i++) {
-                        double[] points = lines.get(i, 0);
-                        double x1, y1, x2, y2;
 
-                        x1 = points[0];
-                        y1 = points[1];
-                        x2 = points[2];
-                        y2 = points[3];
-
-                        Log.d(">>>", "Coordinates: x1=>"+x1+" y1=>"+y1+" x2=>"+x2+" y2=>"+y2);
-
-                        Point pt1 = new Point(x1, y1);
-                        Point pt2 = new Point(x2, y2);
-
-                        //Drawing lines on an image
-                        double dx = x1 - x2;
-                        double dy = y1 - y2;
-                        double dist = Math.sqrt (dx*dx + dy*dy);
-//                        if(dist>300.d)
-                            Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+                    for (int x = 0; x < lines.rows(); x++) {
+                        double rho = lines.get(x, 0)[0],
+                                theta = lines.get(x, 0)[1];
+                        double a = Math.cos(theta), b = Math.sin(theta);
+                        double x0 = a*rho, y0 = b*rho;
+                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 3, Imgproc.LINE_AA, 0);
                     }
+//                    for (int i = 0; i < lines.rows(); i++) {
+//                        double[] points = lines.get(i, 0);
+//                        double x1, y1, x2, y2;
+//
+//                        x1 = points[0];
+//                        y1 = points[1];
+//                        x2 = points[2];
+//                        y2 = points[3];
+//
+//                        Log.d(">>>", "Coordinates: x1=>"+x1+" y1=>"+y1+" x2=>"+x2+" y2=>"+y2);
+//
+//                        Point pt1 = new Point(x1, y1);
+//                        Point pt2 = new Point(x2, y2);
+//
+//                        //Drawing lines on an image
+//                        double dx = x1 - x2;
+//                        double dy = y1 - y2;
+//                        double dist = Math.sqrt (dx*dx + dy*dy);
+////                        if(dist>300.d)
+//                            Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+//                    }
 //
 //                    //Converting Mat back to Bitmap
                     File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
@@ -574,7 +587,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                 clearAndInvalidateCanvas();
 
                 if (!isAutoCaptureScheduled) {
-                    scheduleAutoCapture(scanHint);
+                    //Temporarily disable for this one.
+//                    scheduleAutoCapture(scanHint);
                 }
             }
         }
