@@ -14,7 +14,6 @@ import android.graphics.RectF;
 import android.graphics.drawable.shapes.PathShape;
 import android.hardware.Camera;
 import android.media.AudioManager;
-import android.os.AsyncTask;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.util.Log;
@@ -42,11 +41,12 @@ import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.ximgproc.StructuredEdgeDetection;
-import org.opencv.ximgproc.Ximgproc;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.opencv.core.CvType.CV_8UC1;
@@ -366,7 +366,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     houghLines.create(dilate.rows(), dilate.cols(), CvType.CV_8UC1);
                     //Drawing lines on the image
 
-                    for (int x = 0; x < lines.rows(); x++) {
+                    for (int x = 0; x < lines.rows(); x++) { //count the rows..
                         double rho = lines.get(x, 0)[0],
                                 theta = lines.get(x, 0)[1];
                         double a = Math.cos(theta), b = Math.sin(theta);
@@ -398,6 +398,16 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    }
 //
 //                    //Converting Mat back to Bitmap
+
+                    int group_similar_thr=30;
+
+                    ArrayList<Line> _lines = _cvhoughlines2list(lines);
+
+                    if (group_similar_thr != 0) {
+                        _lines = _group_similar(_lines, group_similar_thr);
+                    }
+
+//                    lines2 = find_intersections(lines, cups_lines)
                     File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
                     String filename = "lines.png";
                     File file = new File(path, filename);
@@ -487,6 +497,58 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             }
         }
     };
+
+    private ArrayList<Line> _group_similar(ArrayList<Line> lines, int thr) {
+//        Comparator<Line> compareById = (Line o1, Line o2) -> o1.getRho().compareTo( o2.getRho());
+        Comparator<Line> compareById = new Comparator<Line>() {
+            @Override
+            public int compare(Line o1, Line o2) {
+                return o1.getRho().compareTo(o2.getRho());
+            }
+        };
+        Collections.sort(lines, compareById);
+
+        ArrayList<Line> lines_unique = new ArrayList<>();
+
+        for (int i = 0; i < lines.size(); i++) {
+            Line to_add = lines.get(i);
+            if (!_is_duplicated(to_add, lines_unique, thr)) {
+                lines_unique.add(to_add);
+            }
+        }
+
+
+//        lines = sorted(lines, key=lambda line: line[0])
+//        lines_unique = []
+//        for to_add in lines:
+//        if not _is_duplicated(to_add, lines_unique, thr):
+//        lines_unique.append(to_add)
+        return lines_unique;
+    }
+
+    private boolean _is_duplicated(Line line, ArrayList<Line> lines_unique, int thr) {
+//        return any(abs(math.fabs(line[0]) - math.fabs(_line[0])) < thr for _line in lines) <- python...
+        for (int i = 0; i < lines_unique.size(); i++) {
+            Line _line = lines_unique.get(i);
+            Log.d(">>>", "abs: " + Math.abs(line.rho - _line.rho));
+            if (Math.abs(line.rho - _line.rho) < thr) return true;
+        }
+        return false;
+    }
+
+    private ArrayList<Line> _cvhoughlines2list(Mat lines) {
+        //return [(line[0][0], line[0][1]) for line in lines] <- python
+        ArrayList<Line> _lines = new ArrayList<>();
+
+        for (int x = 0; x < lines.rows(); x++) {
+            // convert line to array list of `rho` + `theta`...
+            double rho = lines.get(x, 0)[0],
+                    theta = lines.get(x, 0)[1];
+            _lines.add(new Line(rho, theta));
+        }
+        return _lines;
+    }
+
 
     private void drawLargestRect(MatOfPoint2f approx, Point[] points, Size stdSize, int previewArea) {
         Path path = new Path();
@@ -888,5 +950,37 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     @Override
     public void onAutoFocus(boolean b, Camera camera) {
 
+    }
+
+
+    public class Line implements Comparable<Line>{
+        Double rho;
+        Double theta;
+
+        public Line(double rho, double theta) {
+            this.rho = rho;
+            this.theta = theta;
+        }
+
+        public Double getRho() {
+            return rho;
+        }
+
+        public void setRho(Double rho) {
+            this.rho = rho;
+        }
+
+        public Double getTheta() {
+            return theta;
+        }
+
+        public void setTheta(Double theta) {
+            this.theta = theta;
+        }
+
+        @Override
+        public int compareTo(Line o) {
+            return this.getRho().compareTo(o.getRho());
+        }
     }
 }
