@@ -45,6 +45,7 @@ import org.opencv.ximgproc.StructuredEdgeDetection;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -330,9 +331,14 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    bitmap.recycle();
 
 
+
                     final Size originalPreviewSize = mat.size();
                     final int originalPreviewArea = mat.rows() * mat.cols();
                     double scale = 0.2;
+
+                    double newWidth = mat.size().width * scale;
+                    double newHeight = mat.size().height * scale;
+                    Size sz = new Size(newWidth,newHeight);
 //                    double originalWidth = srcImage.size().width;
 //                    double originalHeight = srcImage.size().height;
 //                    double newWidth = srcImage.size().width * scale;
@@ -366,15 +372,16 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     houghLines.create(dilate.rows(), dilate.cols(), CvType.CV_8UC1);
                     //Drawing lines on the image
 
-                    for (int x = 0; x < lines.rows(); x++) { //count the rows..
-                        double rho = lines.get(x, 0)[0],
-                                theta = lines.get(x, 0)[1];
-                        double a = Math.cos(theta), b = Math.sin(theta);
-                        double x0 = a*rho, y0 = b*rho;
-                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
-                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
-                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 3, Imgproc.LINE_AA, 0);
-                    }
+//                    for (int x = 0; x < lines.rows(); x++) { //count the rows..
+//                        double rho = lines.get(x, 0)[0],
+//                                theta = lines.get(x, 0)[1];
+//                        double a = Math.cos(theta), b = Math.sin(theta);
+//                        double x0 = a*rho, y0 = b*rho;
+//                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+//                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+//                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 3, Imgproc.LINE_AA, 0);
+//                    }
+
 //                    for (int i = 0; i < lines.rows(); i++) {
 //                        double[] points = lines.get(i, 0);
 //                        double x1, y1, x2, y2;
@@ -407,7 +414,33 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                         _lines = _group_similar(_lines, group_similar_thr);
                     }
 
-//                    lines2 = find_intersections(lines, cups_lines)
+                    Log.d(">>>", dilate.width() + " rows");
+                    Log.d(">>>", dilate.height() + " height");
+
+                    ArrayList<LinePair> lines2 = find_intersections(_lines, dilate);
+
+                    ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
+
+
+                    // draw here.
+                    // for testing
+//                    for (int x = 0; x < lines2.size(); x++) { //count the rows..
+//                        double rho = lines2.get(x).getLine1().getRho(),
+//                                theta = lines2.get(x).getLine1().getTheta();
+//                        double a = Math.cos(theta) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta);/*y = y0 + r*sin(theta)*/
+//                        double x0 = a*rho, y0 = b*rho;
+//
+//                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+//                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+//                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 3, Imgproc.LINE_AA, 0);
+//                    }
+
+                    // draw dots
+                    for (int x = 0; x < dots.size(); x++) { //count the rows..
+
+                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
+                    }
+
                     File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
                     String filename = "lines.png";
                     File file = new File(path, filename);
@@ -435,9 +468,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     Mat dilate2;
                     dilate2 = ScanUtils.findLargestMat(mat);
-                    double newWidth = mat.size().width * scale;
-                    double newHeight = mat.size().height * scale;
-                    Size sz = new Size(newWidth,newHeight);
+
 //                    Log.d(">>>", "width: " + newWidth);
 //                    Log.d(">>>", "height: " + newHeight);
                     Imgproc.resize( dilate2, dilate2, sz);
@@ -492,11 +523,200 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     }
 
                 } catch (Exception e) {
+                    Log.e(">>>", e.getMessage());
                     showFindingReceiptHint();
                 }
             }
         }
     };
+
+    public Point intersection(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4) {
+        int d = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+        if (d == 0) return new Point(-1, -1);
+
+        int xi = ((x3-x4)*(x1*y2-y1*x2)-(x1-x2)*(x3*y4-y3*x4))/d;
+        int yi = ((y3-y4)*(x1*y2-y1*x2)-(y1-y2)*(x3*y4-y3*x4))/d;
+
+        return new Point(xi,yi);
+    }
+
+    private ArrayList<Intersection> find_intersections2(ArrayList<Line> lines, Mat dilate) {
+
+//        intersections = [];
+//        permutations -> write a customized class for this purpose
+
+        // create a function to make another list that has only 2 items.
+
+        ArrayList<Intersection> intersections = makeIntersections(lines, 45, dilate);
+
+
+//        combinations2()
+
+
+        return intersections;
+    }
+
+    private  ArrayList<LinePair> find_intersections(ArrayList<Line> lines, Mat dilate) {
+
+//        intersections = [];
+//        permutations -> write a customized class for this purpose
+
+        // create a function to make another list that has only 2 items.
+
+        ArrayList<LinePair> linePairs = makeLinePairs(lines, 45, dilate);
+
+
+//        combinations2()
+
+
+        Log.d(">>>", "linePairs: " + linePairs.size());
+        for (int i = 0; i < lines.size(); i++) {
+            // for lines... what to do.
+
+            Line line = lines.get(i);
+        }
+        int vertex_id = 0;
+        return linePairs;
+    }
+
+    static void combinations2(String[] arr, int len, int startPosition, String[] result){
+        if (len == 0){
+            Log.d(">>>","combinations" + Arrays.toString(result));
+//            Log.d(">>>", result.)
+            return;
+        } else {
+
+        }
+        for (int i = startPosition; i <= arr.length-len; i++){
+            result[result.length - len] = arr[i];
+            combinations2(arr, len-1, i+1, result);
+        }
+    }
+
+    private ArrayList<LinePair> makeLinePairs(ArrayList<Line> lines, int angle, Mat dilate) {
+        int height = dilate.height();
+        int width = dilate.width();
+        // Improve this later using  combinations2...
+
+        ArrayList<Intersection> intersections = new ArrayList<>();
+        int vertex_id = 0;
+        ArrayList<LinePair> linePairs = new ArrayList<>();
+        for (int j = 0; j < lines.size(); j++) {
+            for (int k = 0; k < lines.size(); k++) {
+                Line line1 = lines.get(j);
+                Line line2 = lines.get(k);
+                if (j != k && !_angles_are_similar(line1, line2, angle)) {
+                    linePairs.add(new LinePair(lines.get(j), lines.get(k)));
+                    // and _find_intersection_coords here.
+                    Point coords = _find_intersection_coords(line1, line2);
+                    if (_coords_are_valid(coords, width, height) && !_already_present(coords, intersections)) {
+                        intersections.add(new Intersection(vertex_id, new LinePair(line1, line2), coords));
+                        vertex_id++;
+                    }
+                }
+            }
+        }
+        return linePairs;
+    }
+
+    private ArrayList<Intersection> makeIntersections(ArrayList<Line> lines, int angle, Mat dilate) {
+        int height = dilate.height();
+        int width = dilate.width();
+        // Improve this later using  combinations2...
+
+        ArrayList<Intersection> intersections = new ArrayList<>();
+        int vertex_id = 0;
+//        ArrayList<LinePair> linePairs = new ArrayList<>();
+        for (int j = 0; j < lines.size(); j++) {
+            for (int k = 0; k < lines.size(); k++) {
+                Line line1 = lines.get(j);
+                Line line2 = lines.get(k);
+                if (j != k && !_angles_are_similar(line1, line2, angle)) {
+//                    linePairs.add(new LinePair(lines.get(j), lines.get(k)));
+                    // and _find_intersection_coords here.
+                    Point coords = _find_intersection_coords(line1, line2);
+                    if (_coords_are_valid(coords, width, height) && !_already_present(coords, intersections)) {
+                        intersections.add(new Intersection(vertex_id, new LinePair(line1, line2), coords));
+                        vertex_id++;
+                    }
+                }
+            }
+        }
+        return intersections;
+    }
+
+    private boolean _already_present(Point coords, ArrayList<Intersection> intersections) {
+        for (int i = 0; i < intersections.size(); i++) {
+            Intersection intersection = intersections.get(i);
+            Point co = intersection.getCoords();
+            if (co.x == coords.x && co.y == coords.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean _coords_are_valid(Point coords, int width, int height) {
+        return 0 < coords.x && coords.x < width && 0 < coords.y && coords.y < height;
+
+    }
+
+    private Point _find_intersection_coords(Line line1, Line line2) {
+        Double rho1 = line1.getRho();
+        Double theta1 = line1.getTheta();
+        Double rho2 = line2.getRho();
+        Double theta2 = line2.getTheta();
+
+//        double rho = lines2.get(x).getLine1().getRho(),
+//                theta = lines2.get(x).getLine1().getTheta();
+//        double a = Math.cos(theta) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta);/*y = y0 + r*sin(theta)*/
+//        double x0 = a*rho, y0 = b*rho;
+//
+//        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+//        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+
+        double a = Math.cos(theta1) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta1);/*y = y0 + r*sin(theta)*/
+        double x0 = a*rho1, y0 = b*rho1;
+
+        int x1 = (int) Math.round(x0 + 1000 * (-b));
+        int y1 = (int) Math.round(y0 + 1000 * (a));
+
+        int x2 = (int) Math.round(x0 - 1000*(-b));
+        int y2 = (int) Math.round(y0 - 1000*(a));
+
+        a = Math.cos(theta2) /*x = x0 + r*cos(theta)*/;
+        b = Math.sin(theta2);/*y = y0 + r*sin(theta)*/
+        x0 = a*rho2;
+        y0 = b*rho2;
+
+        int x3 = (int) Math.round(x0 + 1000 * (-b));
+        int y3 = (int) Math.round(y0 + 1000 * (a));
+        int x4 = (int) Math.round(x0 - 1000*(-b));
+        int y4 = (int) Math.round(y0 - 1000*(a));
+
+
+        Point point = intersection(x1, y1, x2, y2, x3, y3, x4, y4);
+        return point;
+//        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+//        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+
+//        double a = Math.cos(theta1), b = Math.sin(theta2);
+//        double x0 = a*rho, y0 = b*rho;
+
+
+
+
+    }
+
+    private boolean _angles_are_similar(Line line1, Line line2, int angle) {
+        Log.d(">>>", "angle: " + lines_angle(line1, line2));
+        return lines_angle(line1, line2) < angle;
+    }
+
+    private double lines_angle(Line line1, Line line2) {
+        return Math.abs(line1.getTheta() - line2.getTheta()) * 180 / Math.PI;
+//        return false;
+    }
 
     private ArrayList<Line> _group_similar(ArrayList<Line> lines, int thr) {
 //        Comparator<Line> compareById = (Line o1, Line o2) -> o1.getRho().compareTo( o2.getRho());
@@ -981,6 +1201,68 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         @Override
         public int compareTo(Line o) {
             return this.getRho().compareTo(o.getRho());
+        }
+    }
+
+    public  class LinePair {
+        Line line1;
+        Line line2;
+
+        public LinePair(Line line1, Line line2) {
+            this.line1 = line1;
+            this.line2 = line2;
+        }
+
+        public Line getLine1() {
+            return line1;
+        }
+
+        public void setLine1(Line line1) {
+            this.line1 = line1;
+        }
+
+        public Line getLine2() {
+            return line2;
+        }
+
+        public void setLine2(Line line2) {
+            this.line2 = line2;
+        }
+    }
+
+    public class Intersection {
+        int id;
+        LinePair linePair;
+        Point coords;
+
+        public Intersection(int id, LinePair linePair, Point coords) {
+            this.id = id;
+            this.linePair = linePair;
+            this.coords = coords;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public void setId(int id) {
+            this.id = id;
+        }
+
+        public LinePair getLinePair() {
+            return linePair;
+        }
+
+        public void setLinePair(LinePair linePair) {
+            this.linePair = linePair;
+        }
+
+        public Point getCoords() {
+            return coords;
+        }
+
+        public void setCoords(Point coords) {
+            this.coords = coords;
         }
     }
 }

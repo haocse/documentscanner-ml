@@ -374,6 +374,7 @@ public class ScanUtils {
         double newHeight = srcImage.size().height * scale;
 
         Size sz = new Size(newWidth,newHeight);
+        Size szOrigin = new Size(originalWidth,originalHeight);
         Log.d(">>>", "width: " + newWidth);
         Log.d(">>>", "height: " + newHeight);
         Imgproc.resize( srcImage, resizeimage, sz );
@@ -398,7 +399,7 @@ public class ScanUtils {
 
 
 //        Size sz2 = new Size(originalWidth,originalHeight);
-//        Imgproc.resize(edgesImage, edgesImage, sz2);
+//        Imgproc.resize(edgesImage, edgesImage, szOrigin);
 
 //        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
 //        Mat dilate = new Mat(sz2, CvType.CV_8UC1);
