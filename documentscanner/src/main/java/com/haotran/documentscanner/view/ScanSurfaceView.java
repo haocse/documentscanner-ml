@@ -421,6 +421,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
 
+                    /*quad = */find_quadrilaterals(dots);
+
 
                     // draw here.
                     // for testing
@@ -529,6 +531,14 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             }
         }
     };
+
+    private void find_quadrilaterals(ArrayList<Intersection> intersections) {
+        /*graph = _*/build_graph(intersections);
+    }
+
+    private void build_graph(ArrayList<Intersection> intersections) {
+
+    }
 
     public Point intersection(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4) {
         int d = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
