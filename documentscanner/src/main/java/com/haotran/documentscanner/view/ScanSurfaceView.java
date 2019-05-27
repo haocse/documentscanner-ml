@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 
 import static org.opencv.core.CvType.CV_8UC1;
@@ -360,9 +361,9 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     long houghTime = System.currentTimeMillis();
 //                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 10, 20); // threshold 65
                      //replace HoughLinesP to HoughLines.
-                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 65/*, 100, 20*/); // threshold 65
+//                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 65/*, 100, 20*/); // threshold 65
 //                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 50/*, 100, 20*/); // threshold 65
-//                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 4); // threshold 65
+                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 4); // threshold 65
                     // 100 20
                     // 30 4
                     Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
@@ -408,6 +409,20 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     int group_similar_thr=30;
 
+//                    for (int x = 0; x < lines.rows(); x++) {
+//                        // convert line to array list of `rho` + `theta`...
+////                        double rho = lines.get(x, 0)[0],
+////                                theta = lines.get(x, 0)[1];
+////                        _lines.add(new Line(rho, theta));
+//                        Log.d(">>>line", lines.get(x, 0)[0] + "");
+//                        Log.d(">>>line", lines.get(x, 0)[1] + "");
+//                        Log.d(">>>line", lines.get(x, 0)[2] + "");
+//                        Log.d(">>>line", lines.get(x, 0)[3] + "");
+//
+//                        // convert to rho and theta.. .
+//
+//                    }
+//                    Log.d(">>>lines", lines.toString());
                     ArrayList<Line> _lines = _cvhoughlines2list(lines);
 
                     if (group_similar_thr != 0) {
@@ -417,7 +432,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Log.d(">>>", dilate.width() + " rows");
                     Log.d(">>>", dilate.height() + " height");
 
-                    ArrayList<LinePair> lines2 = find_intersections(_lines, dilate);
+//                    ArrayList<LinePair> lines2 = find_intersections(_lines, dilate);
 
                     ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
 
@@ -537,7 +552,65 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     }
 
     private void build_graph(ArrayList<Intersection> intersections) {
+        /*
+        graph = {k["id"]: [] for k in intersections}
+        for i1, i2 in itertools.permutations(intersections, 2):
+        if _common_line_exists(i1["lines"], i2["lines"]):
+        graph[i1["id"]].append(i2["id"])
+        return graph
+        */
 
+        // 1. loop into intersections => a list of id
+        HashMap<Integer, ArrayList<Integer>> graph = new HashMap<Integer, ArrayList<Integer>>();
+
+        for (int i = 0; i < intersections.size(); i++) {
+            graph.put(intersections.get(i).getId(), new ArrayList<Integer>());
+//            graph[intersections.get(i).getId()] = new ArrayList<>();
+        }
+
+        int size = intersections.size();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (i != j) {
+                    Intersection i1 = intersections.get(i);
+                    Intersection i2 = intersections.get(j);
+                    if (_common_line_exists(i1.getLinePair(), i2.getLinePair())) {
+                        // graph id 1 => ...
+                        int key = intersections.get(i).getId();
+                        ArrayList<Integer> value = graph.get(key);
+                        if (value == null) value = new ArrayList<>();
+//                        graph.put(key, value.add(i2.ge));
+                    }
+                }
+            }
+        }
+//        for (int i = 0; i < intersections.size(); i++) {
+//            Line line1 = intersections.get(i).getLinePair().line1;
+//            Line line2 = intersections.get(i).getLinePair().line2;
+//        }
+
+        // 2. use retainAll to find common line.
+
+
+    }
+
+    private boolean _common_line_exists(LinePair i1Lines, LinePair i2Lines) {
+        // i1lines: line1, line2
+        Line i1line1 = i1Lines.line1; // alpha, theta.
+        Line i1line2 = i1Lines.line2;
+
+        Line i2line1 = i2Lines.line1;
+        Line i2line2 = i2Lines.line2;
+
+//        i1line1.theta//theta
+        if ((i1line1.compare(i2line1)) || (i1line1.compare(i2line2)) || (i1line2.compare(i2line1)) || (i1line2.compare(i2line2))) {
+            Log.d(">>>>", "true");
+        } else {
+            Log.d(">>>>", "false");
+        }
+
+        return (i1line1.compare(i2line1)) && (i1line1.compare(i2line2)) && (i1line2.compare(i2line1)) && (i1line2.compare(i2line2));
+//        return false;
     }
 
     public Point intersection(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4) {
@@ -769,11 +842,28 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     private ArrayList<Line> _cvhoughlines2list(Mat lines) {
         //return [(line[0][0], line[0][1]) for line in lines] <- python
         ArrayList<Line> _lines = new ArrayList<>();
-
+//        Log.d(">>>line", lines.get(x, 0)[0] + "");
+//        Log.d(">>>line", lines.get(x, 0)[1] + "");
+//        Log.d(">>>line", lines.get(x, 0)[2] + "");
+//        Log.d(">>>line", lines.get(x, 0)[3] + "");
         for (int x = 0; x < lines.rows(); x++) {
             // convert line to array list of `rho` + `theta`...
-            double rho = lines.get(x, 0)[0],
-                    theta = lines.get(x, 0)[1];
+
+            double x1 = lines.get(x, 0)[0];
+            double y1 = lines.get(x, 0)[1];
+            double x2 = lines.get(x, 0)[2];
+            double y2 = lines.get(x, 0)[3];
+
+            double k = x2 - x1;
+            if (x2 - x1 == 0) {
+                k = 99999;
+            }
+
+            double theta = -Math.atan2((x2 - x1), (y2 - y1));
+            double rho = x1 * Math.cos(theta) + y1 * Math.sin(theta);
+
+//            double rho = lines.get(x, 0)[0],
+//                    theta = lines.get(x, 0)[1];
             _lines.add(new Line(rho, theta));
         }
         return _lines;
@@ -1211,6 +1301,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         @Override
         public int compareTo(Line o) {
             return this.getRho().compareTo(o.getRho());
+        }
+
+
+        public boolean compare(Line o) {
+            return this.getRho() == o.getRho() && this.getTheta() == this.getTheta();
         }
     }
 
