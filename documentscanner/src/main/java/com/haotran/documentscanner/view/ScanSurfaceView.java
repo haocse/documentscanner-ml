@@ -44,6 +44,7 @@ import org.opencv.ximgproc.StructuredEdgeDetection;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -548,10 +549,74 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     };
 
     private void find_quadrilaterals(ArrayList<Intersection> intersections) {
-        /*graph = _*/build_graph(intersections);
+        HashMap<Integer, ArrayList<Integer>> graph = build_graph(intersections);
+//        int[] loops = new int[10];
+//        int[] seen = new int[10];
+
+        ArrayList<Integer> loops = new ArrayList<>();
+        ArrayList<Integer> seen = new ArrayList<>();
+
+//        ArrayList<Object> loops = new ArrayList<>();
+        for(int node : graph.keySet()) {
+            _bounded_dfs(graph, node, loops, seen);
+        }
+
+//        Log.d(">>>loop", loops.get(0) + "");
+//        for (int i = 0; i < loops.size(); i++) {
+//            Log.d(">>>loop", i + ":" + loops.get(i) + "");
+//        }
+
+        Log.d(">>>loo", loops.size() + "");
+
+
+        /**
+         * for node in graph:
+         * _bounded_dfs(graph, node, loops)
+         */
+
+        // convert loops to coords
+
     }
 
-    private void build_graph(ArrayList<Intersection> intersections) {
+    private void _bounded_dfs(HashMap<Integer, ArrayList<Integer>> neighbours, int current, ArrayList<Integer> loops,  ArrayList<Integer> seen/*list of ids*/) { //
+//        loops.add(1000);
+//        loops.add(2);
+
+//        if current in seen:
+//        # print ("return...")
+//        return
+
+        if (seen.contains(current)) {
+            return;
+        }
+        seen.add(current);
+        if (seen.size() == 4) {
+            _add_if_loop(current, neighbours, seen, loops);
+        } else {
+//            [_bounded_dfs(neighbours, neighbour, loops, seen=seen) for neighbour in neighbours[current]]
+            for (int neighbour : neighbours.keySet()) {
+                _bounded_dfs(neighbours, neighbour, loops, seen);
+            }
+
+        }
+
+        // remove the last one...
+        seen.remove(seen.size()-1);
+
+    }
+
+    private void _add_if_loop(int current, HashMap<Integer, ArrayList<Integer>> neighbours, ArrayList<Integer> seen, ArrayList<Integer> loops) {
+        // if seen[0] in neighbours[current]:
+        if (neighbours.get(current).contains(seen.get(0))) {
+            loops.addAll(seen);
+        }
+    }
+
+    private void _bounded_dfs(HashMap<Integer, ArrayList<Integer>> graph, int node, int[] loops, int[] seen) {
+
+    }
+
+    private HashMap<Integer, ArrayList<Integer>> build_graph(ArrayList<Intersection> intersections) {
         /*
         graph = {k["id"]: [] for k in intersections}
         for i1, i2 in itertools.permutations(intersections, 2):
@@ -559,6 +624,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         graph[i1["id"]].append(i2["id"])
         return graph
         */
+
+        Log.d(">>>intersections", intersections.toString());
 
         // 1. loop into intersections => a list of id
         HashMap<Integer, ArrayList<Integer>> graph = new HashMap<Integer, ArrayList<Integer>>();
@@ -575,15 +642,20 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Intersection i1 = intersections.get(i);
                     Intersection i2 = intersections.get(j);
                     if (_common_line_exists(i1.getLinePair(), i2.getLinePair())) {
+                        Log.d(">>>gra", "exists");
                         // graph id 1 => ...
                         int key = intersections.get(i).getId();
                         ArrayList<Integer> value = graph.get(key);
-                        if (value == null) value = new ArrayList<>();
-//                        graph.put(key, value.add(i2.ge));
+
+//                        if (value == null) value = new ArrayList<>();
+                        value.add(i2.getId()); // add new value (id) //  graph[i1["id"]].append(i2["id"])
+                        graph.put(key, value);
                     }
                 }
             }
         }
+
+        Log.d(">>>graph", graph.toString());
 //        for (int i = 0; i < intersections.size(); i++) {
 //            Line line1 = intersections.get(i).getLinePair().line1;
 //            Line line2 = intersections.get(i).getLinePair().line2;
@@ -591,7 +663,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
         // 2. use retainAll to find common line.
 
-
+        return graph;
     }
 
     private boolean _common_line_exists(LinePair i1Lines, LinePair i2Lines) {
@@ -609,7 +681,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             Log.d(">>>>", "false");
         }
 
-        return (i1line1.compare(i2line1)) && (i1line1.compare(i2line2)) && (i1line2.compare(i2line1)) && (i1line2.compare(i2line2));
+        return ((i1line1.compare(i2line1)) || (i1line1.compare(i2line2)) || (i1line2.compare(i2line1)) || (i1line2.compare(i2line2)));
 //        return false;
     }
 
