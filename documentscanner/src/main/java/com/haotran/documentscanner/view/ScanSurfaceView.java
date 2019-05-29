@@ -44,13 +44,13 @@ import org.opencv.ximgproc.StructuredEdgeDetection;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.opencv.core.CvType.CV_8UC1;
 
@@ -437,7 +437,26 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
 
-                    /*quad = */find_quadrilaterals(dots);
+                    int position = find_quadrilaterals(dots);
+
+                    Log.d(">>>ppp", position + " ");
+                    Point[] points = new Point[4];
+                    if (position != -1) {
+                        Point r1 = dots.get(position).getCoords();
+                        Point r2 = dots.get(position+1).getCoords();
+                        Point r3 = dots.get(position+2).getCoords();
+                        Point r4 = dots.get(position+3).getCoords();
+
+                        points[1] = new Point(r1.x/scale, r1.y/scale);
+                        points[3] =  new Point(r2.x/scale, r2.y/scale);
+                        points[2] =  new Point(r3.x/scale, r3.y/scale);
+                        points[0] =  new Point(r4.x/scale, r4.y/scale);
+                        Imgproc.circle(houghLines, r1, 10, new Scalar(255, 0, 255), 3);
+                        Imgproc.circle(houghLines, r2, 10, new Scalar(255, 0, 255), 3);
+                        Imgproc.circle(houghLines, r3, 10, new Scalar(255, 0, 255), 3);
+                        Imgproc.circle(houghLines, r4, 10, new Scalar(255, 0, 255), 3);
+                    }
+
 
 
                     // draw here.
@@ -454,10 +473,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    }
 
                     // draw dots
-                    for (int x = 0; x < dots.size(); x++) { //count the rows..
-
-                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
-                    }
+//                    for (int x = 0; x < dots.size(); x++) { //count the rows..
+//
+//                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
+//                    }
 
                     File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
                     String filename = "lines.png";
@@ -535,7 +554,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     final Quadrilateral finalLargestQuad = largestQuad;
                     if (null != finalLargestQuad) {
-                        drawLargestRect(finalLargestQuad.contour, finalLargestQuad.points, originalPreviewSize, originalPreviewArea);
+//                        drawLargestRect(finalLargestQuad.contour, finalLargestQuad.points, originalPreviewSize, originalPreviewArea);
+                        drawLargestRect2(points, originalPreviewSize, originalPreviewArea);
                     } else {
                         showFindingReceiptHint();
                     }
@@ -548,7 +568,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         }
     };
 
-    private void find_quadrilaterals(ArrayList<Intersection> intersections) {
+    private int find_quadrilaterals(ArrayList<Intersection> intersections) {
         HashMap<Integer, ArrayList<Integer>> graph = build_graph(intersections);
 //        int[] loops = new int[10];
 //        int[] seen = new int[10];
@@ -566,7 +586,49 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //            Log.d(">>>loop", i + ":" + loops.get(i) + "");
 //        }
 
-        Log.d(">>>loo", loops.size() + "");
+//        Log.d(">>>loo", loops.size() + "");
+
+
+        Map<Integer, Intersection> intersectionHashMap = new HashMap<>();
+        for (int i = 0; i < intersections.size(); i++) {
+//            Log.d(">>>inter", intersections.get(i) + "...");
+            intersectionHashMap.put(intersections.get(i).id, intersections.get(i));
+//            intersections.get(i);
+        }
+        List<Double> areas = new ArrayList<>();
+        /*result = */_cycles2coords(loops, intersectionHashMap, areas);
+
+        if (areas.size() == 0) return -1;
+
+        double maxArea = 0;
+        for (int i = 0; i < areas.size(); i++) {
+//            Log.d(">>>area", areas.get(i) + "");
+
+            Double nMax = areas.get(i);
+            if (maxArea < nMax) {
+                maxArea = nMax;
+            }
+//            Log.d(">>>m", maxArea + " max");
+        }
+
+//        double maxArea = Collections.max(areas);
+
+
+
+        int index = areas.indexOf(maxArea);
+
+        int position = index * 4;
+
+//        Point r1 = intersections.get(position).getCoords();
+//        Point r2 = intersections.get(position+1).getCoords();
+//        Point r3 = intersections.get(position+2).getCoords();
+//        Point r4 = intersections.get(position+3).getCoords();
+
+        // try to draw this one
+
+
+//        return new Point[]{r1, r2, r3, r4};
+        return position < 0 ? 0: position;
 
 
         /**
@@ -576,6 +638,57 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
         // convert loops to coords
 
+    }
+
+    private void _cycles2coords(ArrayList<Integer> cycles, Map<Integer, Intersection> intersections, List<Double> areas) {
+        int i = 0;
+        while (i < cycles.size()) {
+            int[] node = new int[]{cycles.get(i), cycles.get(i+1), cycles.get(i+2), cycles.get(i+3)};
+            node2coords(node, intersections, areas);
+            i = i + 4;
+        }
+//        for (int i = 0; i < cycles.size(); i++) {
+//            // each 4 points... is a quadrilaterial.
+//            if ((i+1)%4==0) {
+//                /// from `id` to `rect`
+//                int[] node = new int[]{cycles.get(i), cycles.get(), cycles.get(0), cycles.get(0)}
+//                _node2coords(, intersections);
+//            }
+//        }
+    }
+
+    private void node2coords(int[] node, Map<Integer, Intersection> intersections,  List<Double> areas) {
+
+        for (int i = 0; i < 4; i++) {
+            ArrayList<Point> rects = new ArrayList<>();
+            Point point = intersections.get(node[i]).getCoords();
+//            Log.d(">>>point", point.toString());
+
+            rects.add(point);
+
+            // calculate area of rects...
+            /**
+             *  abs( ( x 1 y 2 − y 1 x 2 ) + ( x 2 y 3 − y 2 x 3 ) ..... + ( x n y 1 − y n x 1 )) / 2)
+             */
+
+
+        }
+        double x1 = intersections.get(node[0]).getCoords().x;
+        double y1 = intersections.get(node[0]).getCoords().y;
+
+        double x2 = intersections.get(node[1]).getCoords().x;
+        double y2 = intersections.get(node[1]).getCoords().y;
+
+        double x3 = intersections.get(node[2]).getCoords().x;
+        double y3 = intersections.get(node[2]).getCoords().y;
+
+        double x4 = intersections.get(node[3]).getCoords().x;
+        double y4 = intersections.get(node[3]).getCoords().y;
+
+        double area = Math.abs((x1 * y2 - y1 * x2) + (x2 * y3 - y2 * x3) + (x3 * y4 - y3 * x4) + (x4 * y1 - y4 * x1));
+        areas.add(area);
+
+        // area with nodeId:
     }
 
     private void _bounded_dfs(HashMap<Integer, ArrayList<Integer>> neighbours, int current, ArrayList<Integer> loops,  ArrayList<Integer> seen/*list of ids*/) { //
@@ -625,7 +738,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         return graph
         */
 
-        Log.d(">>>intersections", intersections.toString());
+//        Log.d(">>>intersections", intersections.toString());
 
         // 1. loop into intersections => a list of id
         HashMap<Integer, ArrayList<Integer>> graph = new HashMap<Integer, ArrayList<Integer>>();
@@ -642,7 +755,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Intersection i1 = intersections.get(i);
                     Intersection i2 = intersections.get(j);
                     if (_common_line_exists(i1.getLinePair(), i2.getLinePair())) {
-                        Log.d(">>>gra", "exists");
+//                        Log.d(">>>gra", "exists");
                         // graph id 1 => ...
                         int key = intersections.get(i).getId();
                         ArrayList<Integer> value = graph.get(key);
@@ -655,7 +768,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             }
         }
 
-        Log.d(">>>graph", graph.toString());
+//        Log.d(">>>graph", graph.toString());
 //        for (int i = 0; i < intersections.size(); i++) {
 //            Line line1 = intersections.get(i).getLinePair().line1;
 //            Line line2 = intersections.get(i).getLinePair().line2;
@@ -675,11 +788,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         Line i2line2 = i2Lines.line2;
 
 //        i1line1.theta//theta
-        if ((i1line1.compare(i2line1)) || (i1line1.compare(i2line2)) || (i1line2.compare(i2line1)) || (i1line2.compare(i2line2))) {
-            Log.d(">>>>", "true");
-        } else {
-            Log.d(">>>>", "false");
-        }
+//        if ((i1line1.compare(i2line1)) || (i1line1.compare(i2line2)) || (i1line2.compare(i2line1)) || (i1line2.compare(i2line2))) {
+//            Log.d(">>>>", "true");
+//        } else {
+//            Log.d(">>>>", "false");
+//        }
 
         return ((i1line1.compare(i2line1)) || (i1line1.compare(i2line2)) || (i1line2.compare(i2line1)) || (i1line2.compare(i2line2)));
 //        return false;
@@ -724,7 +837,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //        combinations2()
 
 
-        Log.d(">>>", "linePairs: " + linePairs.size());
+//        Log.d(">>>", "linePairs: " + linePairs.size());
         for (int i = 0; i < lines.size(); i++) {
             // for lines... what to do.
 
@@ -864,7 +977,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
     }
 
     private boolean _angles_are_similar(Line line1, Line line2, int angle) {
-        Log.d(">>>", "angle: " + lines_angle(line1, line2));
+//        Log.d(">>>", "angle: " + lines_angle(line1, line2));
         return lines_angle(line1, line2) < angle;
     }
 
@@ -905,7 +1018,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //        return any(abs(math.fabs(line[0]) - math.fabs(_line[0])) < thr for _line in lines) <- python...
         for (int i = 0; i < lines_unique.size(); i++) {
             Line _line = lines_unique.get(i);
-            Log.d(">>>", "abs: " + Math.abs(line.rho - _line.rho));
+//            Log.d(">>>", "abs: " + Math.abs(line.rho - _line.rho));
             if (Math.abs(line.rho - _line.rho) < thr) return true;
         }
         return false;
@@ -958,8 +1071,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         path.lineTo(previewWidth - (float) points[3].y, (float) points[3].x);
         path.close();
 
-        double area = Math.abs(Imgproc.contourArea(approx));
-        Log.i(TAG, "Contour Area: " + String.valueOf(area));
+//        double area = Math.abs(Imgproc.contourArea(approx));
+//        Log.i(TAG, "Contour Area: " + String.valueOf(area));
 
         PathShape newBox = new PathShape(path, previewWidth, previewHeight);
         Paint paint = new Paint();
@@ -980,16 +1093,16 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //        Log.i(TAG, "resultWidth: " + String.valueOf(resultWidth));
 //        Log.i(TAG, "resultHeight: " + String.valueOf(resultHeight));
 
-        ImageDetectionProperties imgDetectionPropsObj
+        /*ImageDetectionProperties imgDetectionPropsObj
                 = new ImageDetectionProperties(previewWidth, previewHeight, resultWidth, resultHeight,
-                previewArea, area, points[0], points[1], points[2], points[3]);
+                previewArea, area, points[0], points[1], points[2], points[3]);*/
 
         final ScanHint scanHint;
 
-        if (imgDetectionPropsObj.isDetectedAreaBeyondLimits()) {
+        /*if (imgDetectionPropsObj.isDetectedAreaBeyondLimits()) {
             scanHint = ScanHint.FIND_RECT;
             cancelAutoCapture();
-        }
+        }*/
 //        else if (imgDetectionPropsObj.isDetectedAreaBelowLimits()) {
 //            Log.d(">>>", "imgDetectionPropsObj.isDetectedAreaBelowLimits()");
 //            cancelAutoCapture();
@@ -1001,7 +1114,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                scanHint = ScanHint.MOVE_CLOSER;
 //            }
 //        }
-        else if (imgDetectionPropsObj.isDetectedHeightAboveLimit()) {
+        /*else if (imgDetectionPropsObj.isDetectedHeightAboveLimit()) {
             Log.d(">>>", "imgDetectionPropsObj.isDetectedHeightAboveLimit()");
             cancelAutoCapture();
             scanHint = ScanHint.MOVE_AWAY;
@@ -1048,13 +1161,131 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         }
         Log.i(TAG, "Preview Area 95%: " + 0.95 * previewArea +
                 " Preview Area 20%: " + 0.20 * previewArea +
-                " Area: " + String.valueOf(area) +
-                " Label: " + scanHint.toString());
+//                " Area: " + String.valueOf(area) +
+                " Label: " + scanHint.toString());*/
 
         border.setStrokeWidth(12);
 
-        iScanner.displayHint(scanHint);
-        setPaintAndBorder(scanHint, paint, border);
+//        iScanner.displayHint(scanHint);
+//        setPaintAndBorder(scanHint, paint, border);
+        scanCanvasView.clear();
+        scanCanvasView.addShape(newBox, paint, border);
+        invalidateCanvas();
+    }
+
+    private void drawLargestRect2(Point[] points, Size stdSize, int previewArea) {
+        Path path = new Path();
+        // ATTENTION: axis are swapped
+        float previewWidth = (float) stdSize.height;
+        float previewHeight = (float) stdSize.width;
+
+//        Log.i(TAG, "previewWidth: " + String.valueOf(previewWidth));
+//        Log.i(TAG, "previewHeight: " + String.valueOf(previewHeight));
+
+        //Points are drawn in anticlockwise direction
+        path.moveTo(previewWidth - (float) points[0].y, (float) points[0].x);
+        path.lineTo(previewWidth - (float) points[1].y, (float) points[1].x);
+        path.lineTo(previewWidth - (float) points[2].y, (float) points[2].x);
+        path.lineTo(previewWidth - (float) points[3].y, (float) points[3].x);
+        path.close();
+
+//        double area = Math.abs(Imgproc.contourArea(approx));
+//        Log.i(TAG, "Contour Area: " + String.valueOf(area));
+
+        PathShape newBox = new PathShape(path, previewWidth, previewHeight);
+        Paint paint = new Paint();
+        Paint border = new Paint();
+
+        //Height calculated on Y axis
+        double resultHeight = points[1].x - points[0].x;
+        double bottomHeight = points[2].x - points[3].x;
+        if (bottomHeight > resultHeight)
+            resultHeight = bottomHeight;
+
+        //Width calculated on X axis
+        double resultWidth = points[3].y - points[0].y;
+        double bottomWidth = points[2].y - points[1].y;
+        if (bottomWidth > resultWidth)
+            resultWidth = bottomWidth;
+
+//        Log.i(TAG, "resultWidth: " + String.valueOf(resultWidth));
+//        Log.i(TAG, "resultHeight: " + String.valueOf(resultHeight));
+
+        /*ImageDetectionProperties imgDetectionPropsObj
+                = new ImageDetectionProperties(previewWidth, previewHeight, resultWidth, resultHeight,
+                previewArea, area, points[0], points[1], points[2], points[3]);*/
+
+        final ScanHint scanHint;
+
+        /*if (imgDetectionPropsObj.isDetectedAreaBeyondLimits()) {
+            scanHint = ScanHint.FIND_RECT;
+            cancelAutoCapture();
+        }*/
+//        else if (imgDetectionPropsObj.isDetectedAreaBelowLimits()) {
+//            Log.d(">>>", "imgDetectionPropsObj.isDetectedAreaBelowLimits()");
+//            cancelAutoCapture();
+//            if (imgDetectionPropsObj.isEdgeTouching()) {
+//                scanHint = ScanHint.MOVE_AWAY;
+//            }
+//            else
+//            {
+//                scanHint = ScanHint.MOVE_CLOSER;
+//            }
+//        }
+        /*else if (imgDetectionPropsObj.isDetectedHeightAboveLimit()) {
+            Log.d(">>>", "imgDetectionPropsObj.isDetectedHeightAboveLimit()");
+            cancelAutoCapture();
+            scanHint = ScanHint.MOVE_AWAY;
+//            scanHint = ScanHint.NO_MESSAGE_WITH_BORDER;
+        }
+        else if (imgDetectionPropsObj.isDetectedWidthAboveLimit()) {
+            Log.d(">>>", "imgDetectionPropsObj.isDetectedWidthAboveLimit()");
+            cancelAutoCapture();
+            scanHint = ScanHint.MOVE_AWAY;
+//            scanHint = ScanHint.NO_MESSAGE_WITH_BORDER;
+        }
+        else if (imgDetectionPropsObj.isDetectedAreaAboveLimit()) {
+            Log.d(">>>", "imgDetectionPropsObj.isDetectedAreaAboveLimit()");
+            cancelAutoCapture();
+            scanHint = ScanHint.MOVE_AWAY;
+//            scanHint = ScanHint.NO_MESSAGE_WITH_BORDER;
+        }
+
+        else {
+//            if (imgDetectionPropsObj.isEdgeTouching()) {
+//                Log.d(">>>", "imgDetectionPropsObj.isEdgeTouching()");
+//                cancelAutoCapture();
+//                scanHint = ScanHint.MOVE_AWAY;
+//            }
+//            else if (imgDetectionPropsObj.isAngleNotCorrect(approx)) {
+//                Log.d(">>>", "imgDetectionPropsObj.isAngleNotCorrect(approx)");
+//                cancelAutoCapture();
+//                scanHint = ScanHint.ADJUST_ANGLE;
+//            }
+//            else
+            {
+                Log.i(TAG, "GREEN" + "(resultWidth/resultHeight) > 4: " + (resultWidth / resultHeight) +
+                        " points[0].x == 0 && points[3].x == 0: " + points[0].x + ": " + points[3].x +
+                        " points[2].x == previewHeight && points[1].x == previewHeight: " + points[2].x + ": " + points[1].x +
+                        "previewHeight: " + previewHeight);
+                scanHint = ScanHint.CAPTURING_IMAGE;
+                clearAndInvalidateCanvas();
+
+                if (!isAutoCaptureScheduled) {
+                    //Temporarily disable for this one.
+//                    scheduleAutoCapture(scanHint);
+                }
+            }
+        }
+        Log.i(TAG, "Preview Area 95%: " + 0.95 * previewArea +
+                " Preview Area 20%: " + 0.20 * previewArea +
+//                " Area: " + String.valueOf(area) +
+                " Label: " + scanHint.toString());*/
+
+        border.setStrokeWidth(12);
+
+//        iScanner.displayHint(scanHint);
+//        setPaintAndBorder(scanHint, paint, border);
         scanCanvasView.clear();
         scanCanvasView.addShape(newBox, paint, border);
         invalidateCanvas();
@@ -1407,6 +1638,52 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         }
     }
 
+    public class Quad {
+        Point p1;
+        Point p2;
+        Point p3;
+        Point p4;
+
+        public Quad(Point p1, Point p2, Point p3, Point p4) {
+            this.p1 = p1;
+            this.p2 = p2;
+            this.p3 = p3;
+            this.p4 = p4;
+        }
+
+        public Point getP1() {
+            return p1;
+        }
+
+        public void setP1(Point p1) {
+            this.p1 = p1;
+        }
+
+        public Point getP2() {
+            return p2;
+        }
+
+        public void setP2(Point p2) {
+            this.p2 = p2;
+        }
+
+        public Point getP3() {
+            return p3;
+        }
+
+        public void setP3(Point p3) {
+            this.p3 = p3;
+        }
+
+        public Point getP4() {
+            return p4;
+        }
+
+        public void setP4(Point p4) {
+            this.p4 = p4;
+        }
+    }
+
     public class Intersection {
         int id;
         LinePair linePair;
@@ -1440,6 +1717,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
         public void setCoords(Point coords) {
             this.coords = coords;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return this.getId() == ((Intersection)obj).getId();
         }
     }
 }
