@@ -364,7 +364,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                      //replace HoughLinesP to HoughLines.
 //                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 65/*, 100, 20*/); // threshold 65
 //                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 50/*, 100, 20*/); // threshold 65
-                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 4); // threshold 65
+                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 45, 50, 10); // threshold 65
                     // 100 20
                     // 30 4
                     Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
@@ -424,7 +424,15 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //
 //                    }
 //                    Log.d(">>>lines", lines.toString());
+
+
+
                     ArrayList<Line> _lines = _cvhoughlines2list(lines);
+                    ArrayList<Line> _lines2 = new ArrayList<>();
+
+//                    ArrayList<Line> newLines = new ArrayList<>();
+
+
 
                     if (group_similar_thr != 0) {
                         _lines = _group_similar(_lines, group_similar_thr);
@@ -437,6 +445,14 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
 
+                    //for testing
+//                    ArrayList<Intersection> newdots = new ArrayList<>();
+
+//                    int size = (dots.size() > 10) ? 10 : newdots.size();
+//                    for (int i = 0; i < size; i++) {
+//                        newdots.add(dots.get(i));
+//                    }
+
                     int position = find_quadrilaterals(dots);
 
                     Log.d(">>>ppp", position + " ");
@@ -447,10 +463,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                         Point r3 = dots.get(position+2).getCoords();
                         Point r4 = dots.get(position+3).getCoords();
 
-                        points[1] = new Point(r1.x/scale, r1.y/scale);
-                        points[3] =  new Point(r2.x/scale, r2.y/scale);
+                        points[0] = new Point(r1.x/scale, r1.y/scale);
+                        points[1] =  new Point(r2.x/scale, r2.y/scale);
                         points[2] =  new Point(r3.x/scale, r3.y/scale);
-                        points[0] =  new Point(r4.x/scale, r4.y/scale);
+                        points[3] =  new Point(r4.x/scale, r4.y/scale);
                         Imgproc.circle(houghLines, r1, 10, new Scalar(255, 0, 255), 3);
                         Imgproc.circle(houghLines, r2, 10, new Scalar(255, 0, 255), 3);
                         Imgproc.circle(houghLines, r3, 10, new Scalar(255, 0, 255), 3);
@@ -476,6 +492,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    for (int x = 0; x < dots.size(); x++) { //count the rows..
 //
 //                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
+//                    }
+
+//                    for (int x = 0; x < newdots.size(); x++) { //count the rows..
+//
+//                        Imgproc.circle(houghLines, newdots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
 //                    }
 
                     File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
@@ -516,7 +537,6 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                     Size sz2 = new Size(originalPreviewSize.width,originalPreviewSize.height);
                     Imgproc.resize(dilate, dilate, sz2);
-
 
 
 
@@ -1050,6 +1070,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //            double rho = lines.get(x, 0)[0],
 //                    theta = lines.get(x, 0)[1];
             _lines.add(new Line(rho, theta));
+            // for testing
+//            if (_lines.size() > 10) return  _lines;
         }
         return _lines;
     }
@@ -1185,8 +1207,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         //Points are drawn in anticlockwise direction
         path.moveTo(previewWidth - (float) points[0].y, (float) points[0].x);
         path.lineTo(previewWidth - (float) points[1].y, (float) points[1].x);
-        path.lineTo(previewWidth - (float) points[2].y, (float) points[2].x);
+
         path.lineTo(previewWidth - (float) points[3].y, (float) points[3].x);
+
+        path.lineTo(previewWidth - (float) points[2].y, (float) points[2].x);
         path.close();
 
 //        double area = Math.abs(Imgproc.contourArea(approx));
