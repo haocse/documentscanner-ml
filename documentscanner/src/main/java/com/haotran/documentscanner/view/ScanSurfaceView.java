@@ -27,13 +27,11 @@ import android.widget.ImageView;
 import com.haotran.documentscanner.constants.ScanConstants;
 import com.haotran.documentscanner.enums.ScanHint;
 import com.haotran.documentscanner.interfaces.IScanner;
-import com.haotran.documentscanner.util.ImageDetectionProperties;
 import com.haotran.documentscanner.util.ScanUtils;
 
 import org.opencv.android.Utils;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -305,7 +303,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Imgproc.cvtColor(yuv, mat, Imgproc.COLOR_YUV2BGR_NV21, 4);
 
                     // make this blur...
-//                    Imgproc.GaussianBlur(mat, mat, new Size(5.0, 5.0), 0.0);
+                    Imgproc.GaussianBlur(mat, mat, new Size(5.0, 5.0), 0.0);
 
 //                    Mat mat = yuv;
 
@@ -360,7 +358,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     /**
                      * dilate -> bold dilate..
                      */
-
+//                    Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
+//                    Imgproc.dilate(dilate, dilate, kernel);
 
                     final Bitmap bm = Bitmap.createBitmap(dilate.cols(), dilate.rows(),Bitmap.Config.ARGB_8888);
                     Utils.matToBitmap(dilate, bm);
@@ -369,16 +368,15 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     Mat lines = new Mat();
                     long houghTime = System.currentTimeMillis();
 
-//                    Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9.0, 9.0));
-//                    Imgproc.dilate(dilate, dilate, kernel);
+
 
 //                    Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 10, 20); // threshold 65
                      //replace HoughLinesP to HoughLines.
 //                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 65/*, 100, 20*/); // threshold 65
 //                    Imgproc.HoughLines(dilate, lines, 1, Math.PI / 180, 50/*, 100, 20*/); // threshold 65
                     Imgproc.HoughLinesP(dilate, lines, 1, Math.PI / 180, 65, 25, 5); // threshold 65
-                    // 100 20
-                    // 30 4
+
+//                    Log.d(">>>lines", lines.rows() + " ");
                     Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
 //                    Log.d(">>>", "Hough Time: " + (System.currentTimeMillis() - houghTime) + "");
 
@@ -419,7 +417,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //
 //                    //Converting Mat back to Bitmap
 
-                    int group_similar_thr=30;
+//                    int group_similar_thr=20;
+                    int group_similar_thr=0;
 
 //                    for (int x = 0; x < lines.rows(); x++) {
 //                        // convert line to array list of `rho` + `theta`...
@@ -452,20 +451,34 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 3, Imgproc.LINE_AA, 0);
 //                    }
 
+                    Log.d(">>>lines_before", _lines.size() + "...");
+
+                    for (int i = 0; i < _lines.size(); i++) {
+                        Double rho = _lines.get(i).rho;
+                        double theta = _lines.get(i).theta;
+                        double a = Math.cos(theta) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta);/*y = y0 + r*sin(theta)*/
+                        double x0 = a*rho, y0 = b*rho;
+
+                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+                    }
                     if (group_similar_thr != 0) {
                         _lines = _group_similar(_lines, group_similar_thr);
 
-                        for (int i = 0; i < _lines.size(); i++) {
-                            Double rho = _lines.get(i).rho;
-                            double theta = _lines.get(i).theta;
-                            double a = Math.cos(theta) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta);/*y = y0 + r*sin(theta)*/
-                            double x0 = a*rho, y0 = b*rho;
-
-                            Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
-                            Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
-                            Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
-                        }
                     }
+
+                    Log.d(">>>lines_after", _lines.size() + "...");
+//                    for (int i = 0; i < _lines.size(); i++) {
+//                        Double rho = _lines.get(i).rho;
+//                        double theta = _lines.get(i).theta;
+//                        double a = Math.cos(theta) /*x = x0 + r*cos(theta)*/, b = Math.sin(theta);/*y = y0 + r*sin(theta)*/
+//                        double x0 = a*rho, y0 = b*rho;
+//
+//                        Point pt1 = new Point(Math.round(x0 + 1000*(-b)), Math.round(y0 + 1000*(a)));
+//                        Point pt2 = new Point(Math.round(x0 - 1000*(-b)), Math.round(y0 - 1000*(a)));
+//                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+//                    }
 
                     Log.d(">>>", dilate.width() + " rows");
                     Log.d(">>>", dilate.height() + " height");
@@ -473,11 +486,40 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    ArrayList<LinePair> lines2 = find_intersections(_lines, dilate);
 
                     ArrayList<Intersection> dots = find_intersections2(_lines, dilate);
+//                    ArrayList<Intersection> newDots = new ArrayList<>();
 
-                    Log.d(">>>", "time for finding dots: " + (System.currentTimeMillis()-processTime));
+//                    Rect rect = new Rect(0, 0, (int)newWidth, (int)newHeight);
+//                    int rectSize = dots.size();
+//                    for (int i = 0; i < rectSize; i++) {
+//                        Intersection intersection = dots.get(i);
+//                        Point coord = intersection.coords;
+//                        Log.d(">>>coords", "" + i);
+//                        Log.d(">>>", coord.toString());
+//                        Log.d(">>>coords", "width,height: " + newWidth + " : " + newHeight);
+//
+//                        if (coord.x < newWidth && coord.y < newHeight) {
+//                            Log.d(">>>checking", "inside");
+//                            newDots.add(intersection);
+//                        } else {
+//                            Log.d(">>>checking", "outside");
+//                        }
+//
+////                        Imgproc.circle(houghLines, coord, 10, new Scalar(255, 0, 255), 3);
+////                        if (rect.contains((int)coord.x, (int)coord.y)) {
+////                            Log.d(">>>contains", "hey");
+////                            newDots.add(intersection);
+////                        } else {
+////                            Log.d(">>>contains", "nooo");
+////                        }
+//
+//                    }
+
+//                    Imgproc.rectangle(houghLines, new Point(), pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
+                    Log.d(">>>dots", "time for finding dots: " + (System.currentTimeMillis()-processTime));
                     Log.d(">>>dots", dots.size() + "");
+//                    Log.d(">>>dots", "new: " + newDots.size() + "");
 
-
+//                    dots = newDots;
 
                     //for testing
 //                    ArrayList<Intersection> newdots = new ArrayList<>();
@@ -487,27 +529,43 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                        newdots.add(dots.get(i));
 //                    }
 
-                    int position = find_quadrilaterals(dots);
+                    for (int i = 0; i < dots.size(); i++) {
+                        Intersection intersection = dots.get(i);
+                        Point coord = intersection.coords;
 
-                    Log.d(">>>ppp", position + " ");
+                        Imgproc.circle(houghLines, coord, 10, new Scalar(255, 0, 255), 3);
+                    }
 
-                    Log.d(">>>", "time for processing: " + (System.currentTimeMillis()-processTime));
+                    long justATime = System.currentTimeMillis();
+
+                    ArrayList<Double> rect = find_quadrilaterals(dots);
+
+//                    Log.d(">>>dots_position", position + " ");
+//                    Log.d(">>>dots", "time for finding quad: " + (System.currentTimeMillis()-justATime));
+//                    Log.d(">>>", "time for processing: " + (System.currentTimeMillis()-processTime));
+
+
 
                     Point[] points = new Point[4];
-                    if (position != -1) {
-                        Point r1 = dots.get(position).getCoords();
-                        Point r2 = dots.get(position+1).getCoords();
-                        Point r3 = dots.get(position+2).getCoords();
-                        Point r4 = dots.get(position+3).getCoords();
 
-                        points[0] = new Point(r1.x/scale, r1.y/scale);
-                        points[1] =  new Point(r2.x/scale, r2.y/scale);
-                        points[2] =  new Point(r3.x/scale, r3.y/scale);
-                        points[3] =  new Point(r4.x/scale, r4.y/scale);
-                        Imgproc.circle(houghLines, r1, 10, new Scalar(255, 0, 255), 3);
-                        Imgproc.circle(houghLines, r2, 10, new Scalar(255, 0, 255), 3);
-                        Imgproc.circle(houghLines, r3, 10, new Scalar(255, 0, 255), 3);
-                        Imgproc.circle(houghLines, r4, 10, new Scalar(255, 0, 255), 3);
+//                    if (position != -1 && position+3 < dots.size()) {
+                    if (rect.size() > 0) {
+//                        Point r1 = dots.get(position).getCoords();
+//                        Point r2 = dots.get(position+1).getCoords();
+//                        Point r3 = dots.get(position+2).getCoords();
+//                        Point r4 = dots.get(position+3).getCoords();
+
+//                        points[0] = new Point(r1.x/scale, r1.y/scale);
+//                        points[1] =  new Point(r2.x/scale, r2.y/scale);
+//                        points[2] =  new Point(r3.x/scale, r3.y/scale);
+//                        points[3] =  new Point(r4.x/scale, r4.y/scale);
+
+                        points[0] = new Point(rect.get(0)/scale, rect.get(1)/scale);
+                        points[1] =  new Point(rect.get(2)/scale, rect.get(3)/scale);
+                        points[2] =  new Point(rect.get(4)/scale, rect.get(5)/scale);
+                        points[3] =  new Point(rect.get(6)/scale, rect.get(7)/scale);
+                    } else {
+//                        return;
                     }
 
 
@@ -526,20 +584,25 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                    }
 
                     // draw dots
-                    for (int x = 0; x < dots.size(); x++) { //count the rows..
-                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
-                    }
+//                    for (int x = 0; x < dots.size(); x++) { //count the rows..
+//                        Imgproc.circle(houghLines, dots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
+//                    }
+
+//                    Imgproc.circle(houghLines, new Point(0, 0), 10, new Scalar(255, 0, 255), 3);
+//                    Imgproc.circle(houghLines, new Point(newWidth, 0), 10, new Scalar(255, 0, 255), 3);
+//                    Imgproc.circle(houghLines, new Point(0, newHeight), 10, new Scalar(255, 0, 255), 3);
+//                    Imgproc.circle(houghLines, new Point(newWidth, newHeight), 10, new Scalar(255, 0, 255), 3);
 
 //                    for (int x = 0; x < newdots.size(); x++) { //count the rows..
 //                        Imgproc.circle(houghLines, newdots.get(x).getCoords(), 10, new Scalar(255, 0, 255), 3);
 //                    }
 
                     long timefortesting = System.currentTimeMillis();
-                    File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-                    String filename = "lines.png";
-                    File file = new File(path, filename);
-                    filename = file.toString();
-                    Imgcodecs.imwrite(filename, houghLines);
+//                    File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+//                    String filename = "lines.png";
+//                    File file = new File(path, filename);
+//                    filename = file.toString();
+//                    Imgcodecs.imwrite(filename, houghLines);
 
                     final Bitmap currentBitmap = Bitmap.createBitmap(dilate.cols(), dilate.rows(),Bitmap.Config.ARGB_8888);
                     Utils.matToBitmap(houghLines, currentBitmap);
@@ -547,10 +610,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                     imageView2.setImageBitmap(bm);
                     houghLines.release();
 
-                    filename = "processed.png";
-                    file = new File(path, filename);
-                    filename = file.toString();
-                    Imgcodecs.imwrite(filename, dilate);
+//                    filename = "processed.png";
+//                    file = new File(path, filename);
+//                    filename = file.toString();
+//                    Imgcodecs.imwrite(filename, dilate);
 
 //                    Mat dilate2;
 //                    dilate2 = ScanUtils.findLargestMat(mat);
@@ -571,35 +634,25 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                            largestQuad = mLargestRect;
 //                    }
 
-                    Log.d(">>>", "testing2 " + (System.currentTimeMillis()-timefortesting));
+//                    Log.d(">>>", "testing2 " + (System.currentTimeMillis()-timefortesting));
 
 //                    Quadrilateral largestQuad = ScanUtils.detectLargestQuadrilateral(img);
                     clearAndInvalidateCanvas();
-//                    img.release();
-
                     mat.release();
                     dilate.release();
-//
-//                    final Quadrilateral finalLargestQuad = largestQuad;
-//                    if (null != finalLargestQuad) {
-////                        drawLargestRect(finalLargestQuad.contour, finalLargestQuad.points, originalPreviewSize, originalPreviewArea);
-//                        drawLargestRect2(points, originalPreviewSize, originalPreviewArea);
-//                    } else {
-//                        showFindingReceiptHint();
-//                    }
-
                     drawLargestRect2(points, originalPreviewSize, originalPreviewArea);
-
+                    Log.d(">>>error", "done");
                 } catch (Exception e) {
-                    Log.e(">>>", e.getMessage());
-                    showFindingReceiptHint();
+                    Log.e(">>>error", e.getMessage());
+//                    showFindingReceiptHint();
                 }
             }
         }
     };
 
-    private int find_quadrilaterals(ArrayList<Intersection> intersections) {
+    private ArrayList<Double> find_quadrilaterals(ArrayList<Intersection> intersections) {
         HashMap<Integer, ArrayList<Integer>> graph = build_graph(intersections);
+
 //        int[] loops = new int[10];
 //        int[] seen = new int[10];
 
@@ -608,14 +661,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
 //        ArrayList<Object> loops = new ArrayList<>();
         for(int node : graph.keySet()) {
+//            Log.d(">>>graph", graph.get(node).toString());
             _bounded_dfs(graph, node, loops, seen);
         }
 
-//        Log.d(">>>loop", loops.get(0) + "");
-//        for (int i = 0; i < loops.size(); i++) {
-//            Log.d(">>>loop", i + ":" + loops.get(i) + "");
-//        }
-
+//        Log.d(">>>loop", print);
 //        Log.d(">>>loo", loops.size() + "");
 
 
@@ -625,41 +675,22 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
             intersectionHashMap.put(intersections.get(i).id, intersections.get(i));
 //            intersections.get(i);
         }
-        List<Double> areas = new ArrayList<>();
-        /*result = */_cycles2coords(loops, intersectionHashMap, areas);
+//        List<Double> areas = new ArrayList<>();
+        /*result = */return _cycles2coords(loops, intersectionHashMap);
 
-        if (areas.size() == 0) return -1;
+//        if (areas.size() == 0) return -1; else return 0;
 
-        double maxArea = 0;
-        for (int i = 0; i < areas.size(); i++) {
-//            Log.d(">>>area", areas.get(i) + "");
-
-            Double nMax = areas.get(i);
-            if (maxArea < nMax) {
-                maxArea = nMax;
-            }
-//            Log.d(">>>m", maxArea + " max");
-        }
-
-//        double maxArea = Collections.max(areas);
-
-
-
-        int index = areas.indexOf(maxArea);
-
-        int position = index * 4;
-
-//        Point r1 = intersections.get(position).getCoords();
-//        Point r2 = intersections.get(position+1).getCoords();
-//        Point r3 = intersections.get(position+2).getCoords();
-//        Point r4 = intersections.get(position+3).getCoords();
-
-        // try to draw this one
-
-
-//        return new Point[]{r1, r2, r3, r4};
-        return position < 0 ? 0: position;
-
+//        double maxArea = 0;
+//        for (int i = 0; i < areas.size(); i++) {
+//            Double nMax = areas.get(i);
+//            if (maxArea < nMax) {
+//                maxArea = nMax;
+//            }
+//        }
+//
+//        int index = areas.indexOf(maxArea);
+//        int position = index * 4;
+//        return position < 0 ? 0: position ;
 
         /**
          * for node in graph:
@@ -670,13 +701,31 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
     }
 
-    private void _cycles2coords(ArrayList<Integer> cycles, Map<Integer, Intersection> intersections, List<Double> areas) {
+
+    private ArrayList<Double> _cycles2coords(ArrayList<Integer> cycles, Map<Integer, Intersection> intersections) {
+        double maxArea = 0;
         int i = 0;
+        ArrayList<Double> coords = new ArrayList<>();
         while (i < cycles.size()) {
             int[] node = new int[]{cycles.get(i), cycles.get(i+1), cycles.get(i+2), cycles.get(i+3)};
-            node2coords(node, intersections, areas);
+            double area = node2coords(node, intersections);
+            if (maxArea < area) {
+                maxArea = area;
+                coords.clear();
+                coords.add(intersections.get(cycles.get(i)).getCoords().x);
+                coords.add(intersections.get(cycles.get(i)).getCoords().y);
+                coords.add(intersections.get(cycles.get(i+1)).getCoords().x);
+                coords.add(intersections.get(cycles.get(i+1)).getCoords().y);
+                coords.add(intersections.get(cycles.get(i+2)).getCoords().x);
+                coords.add(intersections.get(cycles.get(i+2)).getCoords().y);
+                coords.add(intersections.get(cycles.get(i+3)).getCoords().x);
+                coords.add(intersections.get(cycles.get(i+3)).getCoords().y);
+
+            }
             i = i + 4;
         }
+
+        return coords;
 //        for (int i = 0; i < cycles.size(); i++) {
 //            // each 4 points... is a quadrilaterial.
 //            if ((i+1)%4==0) {
@@ -685,9 +734,21 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                _node2coords(, intersections);
 //            }
 //        }
+
+//        Log.d(">>>max", maxArea + "");
     }
 
-    private void node2coords(int[] node, Map<Integer, Intersection> intersections,  List<Double> areas) {
+//    double maxArea = 0;
+    double mx1 = 0;
+    double my1 = 0;
+    double mx2 = 0;
+    double my2 = 0;
+    double mx3 = 0;
+    double my3 = 0;
+    double mx4 = 0;
+    double my4 = 0;
+
+    private double node2coords(int[] node, Map<Integer, Intersection> intersections) {
 
         for (int i = 0; i < 4; i++) {
             ArrayList<Point> rects = new ArrayList<>();
@@ -716,7 +777,21 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         double y4 = intersections.get(node[3]).getCoords().y;
 
         double area = Math.abs((x1 * y2 - y1 * x2) + (x2 * y3 - y2 * x3) + (x3 * y4 - y3 * x4) + (x4 * y1 - y4 * x1));
-        areas.add(area);
+//        Log.d(">>>area: ", area + " ");
+//        if (area > 200f) {
+//            areas.add(area);
+//        }
+
+//        ArrayList<Double> array = new ArrayList<>();
+//        if (maxArea < area) {
+//            maxArea = area;
+//        }
+
+        return area;
+
+//        return maxArea;
+//        areas.add(area);
+
 
         // area with nodeId:
     }
@@ -1060,7 +1135,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         for (int i = 0; i < lines_unique.size(); i++) {
             Line _line = lines_unique.get(i);
 //            Log.d(">>>", "abs: " + Math.abs(line.rho - _line.rho));
-            if (Math.abs(line.rho - _line.rho) < thr) return true;
+            if (Math.abs(line.rho - _line.rho) < thr) return true; // how about theta...
         }
         return false;
     }
@@ -1236,6 +1311,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         invalidateCanvas();
     }
 
+    int paintColor = Color.argb(30, 38, 216, 76);
+    int borderColor = Color.rgb(38, 216, 76);
     private void drawLargestRect2(Point[] points, Size stdSize, int previewArea) {
         Path path = new Path();
         // ATTENTION: axis are swapped
@@ -1248,10 +1325,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         //Points are drawn in anticlockwise direction
         path.moveTo(previewWidth - (float) points[0].y, (float) points[0].x);
         path.lineTo(previewWidth - (float) points[1].y, (float) points[1].x);
-
+        path.lineTo(previewWidth - (float) points[2].y, (float) points[2].x);
         path.lineTo(previewWidth - (float) points[3].y, (float) points[3].x);
 
-        path.lineTo(previewWidth - (float) points[2].y, (float) points[2].x);
+
         path.close();
 
 //        double area = Math.abs(Imgproc.contourArea(approx));
@@ -1351,6 +1428,9 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
 //        iScanner.displayHint(scanHint);
 //        setPaintAndBorder(scanHint, paint, border);
+
+        paint.setColor(paintColor);
+        border.setColor(borderColor);
         scanCanvasView.clear();
         scanCanvasView.addShape(newBox, paint, border);
         invalidateCanvas();

@@ -374,7 +374,7 @@ public class ScanUtils {
         double newHeight = srcImage.size().height * scale;
 
         Size sz = new Size(newWidth,newHeight);
-        Size szOrigin = new Size(originalWidth,originalHeight);
+//        Size szOrigin = new Size(originalWidth,originalHeight);
         Log.d(">>>", "width: " + newWidth);
         Log.d(">>>", "height: " + newHeight);
         Imgproc.resize( srcImage, resizeimage, sz );
