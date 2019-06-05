@@ -8,7 +8,9 @@
     <uses-feature android:name="android.hardware.camera.autofocus" />
     <uses-feature android:name="android.hardware.camera" />
 
-    <application android:supportsRtl="true">
+    <application android:supportsRtl="true"
+
+        >
         <activity
             android:name="com.haotran.documentscanner.activity.ScanActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />

@@ -367,9 +367,12 @@ public class ScanUtils {
 
         // make a smaller scale...
         Mat resizeimage = new Mat();
-        double scale = 0.2;
-        double originalWidth = srcImage.size().width;
-        double originalHeight = srcImage.size().height;
+        double scale = 0.2; // width*0.15 = 460
+        /**
+         * width = 300 =>height
+         */
+//        double originalWidth = srcImage.size().width;
+//        double originalHeight = srcImage.size().height;
         double newWidth = srcImage.size().width * scale;
         double newHeight = srcImage.size().height * scale;
 
