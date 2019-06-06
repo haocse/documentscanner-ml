@@ -381,6 +381,7 @@ public class ScanUtils {
         Log.d(">>>", "width: " + newWidth);
         Log.d(">>>", "height: " + newHeight);
         Imgproc.resize( srcImage, resizeimage, sz );
+        Imgproc.GaussianBlur(resizeimage, resizeimage, new Size(5.0, 5.0), 0.0);
         edgeDetection.detectEdges(resizeimage, edgesImage);
 
         long printed = System.currentTimeMillis() - time1;

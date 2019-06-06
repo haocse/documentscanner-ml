@@ -50,8 +50,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.opencv.core.CvType.CV_8UC1;
 
@@ -288,10 +295,10 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
 
 //                executors.diskIO().execute(new Runnable() {
-
-                executors.diskIO().execute(new Runnable() {
+                RunnableFuture future = new FutureTask(new Callable() {
                     @Override
-                    public void run() {
+                    public Object call() throws Exception {
+
                         currentTime = System.currentTimeMillis();
 
                         if (null != camera ) {
@@ -309,7 +316,7 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                             Imgproc.cvtColor(yuv, mat, Imgproc.COLOR_YUV2BGR_NV21, 4);
 
                             // make this blur...
-                            Imgproc.GaussianBlur(mat, mat, new Size(5.0, 5.0), 0.0);
+//                            Imgproc.GaussianBlur(mat, mat, new Size(5.0, 5.0), 0.0);
 
 //                    Mat mat = yuv;
 
@@ -485,8 +492,8 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 //                        Imgproc.line(houghLines, pt1, pt2, new Scalar(255, 0, 255), 1, Imgproc.LINE_AA);
 //                    }
 
-                            Log.d(">>>", dilate.width() + " rows");
-                            Log.d(">>>", dilate.height() + " height");
+//                            Log.d(">>>", dilate.width() + " rows");
+//                            Log.d(">>>", dilate.height() + " height");
 
 //                    ArrayList<LinePair> lines2 = find_intersections(_lines, dilate);
 
@@ -543,13 +550,13 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
 
                             long justATime = System.currentTimeMillis();
 
-                            ArrayList<Double> rect = find_quadrilaterals(dots);
+                            ArrayList<Double> rect = find_quadrilaterals(dots, currentTime);
 
 
 
 //                    Log.d(">>>dots_position", position + " ");
-                    Log.d(">>>dots", "time for finding quad: " + (System.currentTimeMillis()-justATime));
-                    Log.d(">>>", "time for processing: " + (System.currentTimeMillis()-processTime));
+                            Log.d(">>>dots", "time for finding quad: " + (System.currentTimeMillis()-justATime));
+                            Log.d(">>>", "time for processing: " + (System.currentTimeMillis()-processTime));
 
 
 
@@ -673,17 +680,48 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
                                     }
                                 });
                             }
+
+                            Log.d(">>>", "total time: " + (System.currentTimeMillis()-currentTime));
                         }
+
+                        return null;
                     }
                 });
+//                ExecutorService service = (ExecutorService) executors.diskIO();
+                ExecutorService service = (ExecutorService) Executors.newSingleThreadExecutor();
+                service.execute(future);
+                Object result = null;
+                try
+                {
+                    result = future.get(300, TimeUnit.MILLISECONDS);    // wait 1 second
+                    ((Activity)context).runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+//                            clearAndInvalidateCanvas();
+                        }
+                    });
+                }
+                catch (TimeoutException ex)
+                {
+                    // timed out. Try to stop the code if possible.
+                    Log.d(">>>error", "timeout");
+                    future.cancel(true);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    Log.d(">>>error", e.getMessage());
+                    future.cancel(true);
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                    Log.d(">>>error", e.getMessage());
+                    future.cancel(true);
+                }
+                service.shutdown();
+
             }
-
-
-
         }
     };
 
-    private ArrayList<Double> find_quadrilaterals(ArrayList<Intersection> intersections) {
+    private ArrayList<Double> find_quadrilaterals(ArrayList<Intersection> intersections, long currentTime) {
         HashMap<Integer, ArrayList<Integer>> graph = build_graph(intersections);
 
 //        int[] loops = new int[10];
@@ -693,8 +731,11 @@ public class ScanSurfaceView extends FrameLayout implements SurfaceHolder.Callba
         ArrayList<Integer> seen = new ArrayList<>();
 
 //        ArrayList<Object> loops = new ArrayList<>();
+
         for(int node : graph.keySet()) {
 //            Log.d(">>>graph", graph.get(node).toString());
+//            Log.d(">>>bounded", (System.currentTimeMillis()-currentTime) + "");
+            if ((System.currentTimeMillis()-currentTime) > 500) break; // for temporary
             _bounded_dfs(graph, node, loops, seen);
         }
 
